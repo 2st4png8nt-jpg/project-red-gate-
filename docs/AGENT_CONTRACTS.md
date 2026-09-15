@@ -56,13 +56,27 @@ Does not own combat UI or battle logic.
 
 ## AGENT 2 — Combat
 
-Owns: `scripts/combat/`.
+Owns: `scripts/combat/`, `data/skills/`.
 
 Must consume (not redefine): `PlayerData` from Agent 3, `EnemyData` from
-Agent 6, equipment effects from Agent 3. Exposes the interface in
-ARCHITECTURE.md Section 6. Does not own inventory UI (Agent 5).
+Agent 6, equipment effects from Agent 3 (not yet wired into damage math
+— Phase 3/4). Exposes the interface in ARCHITECTURE.md Section 6. Does
+not own inventory UI or the command menu itself (Agent 5) — only the
+state machine those UI elements drive.
 
-Not started in Phase 0 — Phase 2.
+Delivered in Phase 2:
+- `BattleManager` (`scripts/combat/battle_manager.gd`) — full state
+  machine: `start_battle()`, the five `player_*()` command methods,
+  enemy turn resolution (always uses the enemy's first skill if it has
+  one), victory/defeat/flee handling.
+- `EncounterData` schema (`scripts/data/encounter_data.gd`) — single-
+  enemy encounters (`enemy_id`, `can_flee`).
+- 3 player skills (Ember Slash, Guard Break, Second Wind) and 3 enemy
+  skills as `SkillData` rows in `data/skills/`.
+- Real bug found and fixed by the Phase 2 headless self-test: moved
+  `BattleManager`'s state init from `_ready()` to `_enter_tree()` so
+  its child `BattleUI` never reads `enemy`/`player` as null — see
+  ARCHITECTURE.md Section 6 for why.
 
 ## AGENT 3 — RPG / Gear
 
@@ -81,6 +95,12 @@ Delivered in Phase 0:
 
 Full leveling math, inventory UI hookup, and equipment comparison are
 Phase 3/4 work, not Phase 0.
+
+Delivered in Phase 2:
+- `Leveling` (`scripts/rpg/leveling.gd`) — minimal placeholder XP curve
+  (`xp_to_next_level(level) = level * 20`) used by `BattleManager._win()`
+  to grant XP and apply level-ups. Deliberately simple; real balancing
+  is Phase 3/4 (GAME_DESIGN.md Section 27 — play and measure first).
 
 ## AGENT 4 — World / Gate
 
@@ -121,6 +141,19 @@ maps are currently entered through a plain `MapTransitionArea` doorway
 in Town — Phase 5 replaces that doorway's trigger with real Gate
 combination entry (the destination logic does not change).
 
+Delivered in Phase 2:
+- `EncounterTrigger` (`scripts/world/encounter_trigger.gd`) — one-shot
+  walk-in trigger calling `SceneManager.go_to_battle(encounter_id)`,
+  mirroring `MapTransitionArea`'s pattern.
+- Three encounter triggers placed in Cinderfall Woods (two common
+  enemies in the main corridor, the Cinder Wraith mini-boss in the
+  branch alcove), each with a small colored marker so a playtester can
+  see them coming (per QA/CHECKLIST.md).
+- `SceneManager.go_to_battle()` implemented for real (was a Phase 1
+  stub): sets `GameState.pending_encounter_id`, defers the scene change
+  to `Battle.tscn`, and deliberately leaves `current_map_id` untouched
+  so `BattleUI` can return the player to the same map after the fight.
+
 ## AGENT 5 — UI / UX
 
 Owns: `scripts/ui/`, `scenes/ui/`.
@@ -129,12 +162,34 @@ Not started in Phase 0 beyond what Boot/Town minimally need (if
 anything — Phase 0's bootable prototype may ship with zero custom UI).
 UI reads state from systems; it must not contain core game logic.
 
+Delivered in Phase 2:
+- `BattleUI` (`scripts/ui/battle_ui.gd` + `scenes/ui/BattleUI.tscn`) —
+  command menu (Attack/Skill/Item/Defend/Run), a skill submenu built
+  from `data/skills/`, HP/MP display, a message log, and the
+  post-battle victory/defeat/flee transitions back to the world. Reads
+  `BattleManager` only through its signals and public fields (`enemy`,
+  `enemy_hp`, `player`) — never calls into its private `_win()`/`_lose()`
+  methods or touches damage math.
+
 ## AGENT 6 — Enemy / Content
 
 Owns: `data/enemies/`, `data/encounters/`, `scripts/enemies/`.
 
 Not started in Phase 0. `EnemyData` schema is defined by Agent 1/Lead
 now so Agent 3/Agent 2 can see its shape; content authoring is Phase 2/4.
+
+Delivered in Phase 2:
+- `EnemyData` rows for the three Cinderfall Woods enemies from
+  GAME_DESIGN.md: Ember Wisp, Bramble Husk, and the mini-boss Cinder
+  Wraith (each with one `SkillData` reference — see Agent 2's Phase 2
+  delivery for the skill rows themselves).
+- `EncounterData` rows pairing each enemy into a single-enemy
+  encounter; the Cinder Wraith's has `can_flee = false`.
+- Silent Marsh's enemies (Tideling, Hollow Stalker) are deferred until
+  that map is actually built — no content without a place to use it.
+- `scripts/enemies/` (enemy-specific behavior scripts, beyond "use
+  skill_ids[0]") remains empty; not needed until enemy AI grows beyond
+  Phase 2's single-skill default.
 
 ## AGENT 7 — Art / Presentation
 
@@ -234,6 +289,11 @@ ARCHITECTURE.md Section 8 save-data notes if it affects save data).
 
 ### `PlayerData` (scripts/rpg/player_data.gd)
 See Agent 3 section above for the full field list.
+
+### `EncounterData` (scripts/data/encounter_data.gd) — added Phase 2
+- `id: String`
+- `enemy_id: String`
+- `can_flee: bool`
 
 ---
 

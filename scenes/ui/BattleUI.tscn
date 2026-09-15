@@ -1,0 +1,88 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/battle_ui.gd" id="1"]
+
+[node name="BattleUI" type="CanvasLayer"]
+script = ExtResource("1")
+
+[node name="Root" type="Control" parent="."]
+offset_right = 640.0
+offset_bottom = 360.0
+
+[node name="Background" type="ColorRect" parent="Root"]
+offset_right = 640.0
+offset_bottom = 360.0
+color = Color(0.12, 0.05, 0.05, 0.92)
+
+[node name="EnemyPanel" type="Control" parent="Root"]
+offset_left = 190.0
+offset_top = 16.0
+offset_right = 450.0
+offset_bottom = 64.0
+
+[node name="EnemyName" type="Label" parent="Root/EnemyPanel"]
+offset_right = 260.0
+offset_bottom = 24.0
+text = "Enemy"
+
+[node name="EnemyHP" type="Label" parent="Root/EnemyPanel"]
+offset_top = 24.0
+offset_right = 260.0
+offset_bottom = 48.0
+text = "HP --/--"
+
+[node name="PlayerPanel" type="Control" parent="Root"]
+offset_left = 16.0
+offset_top = 300.0
+offset_right = 260.0
+offset_bottom = 352.0
+
+[node name="PlayerHP" type="Label" parent="Root/PlayerPanel"]
+offset_right = 240.0
+offset_bottom = 24.0
+text = "HP --/--"
+
+[node name="PlayerMP" type="Label" parent="Root/PlayerPanel"]
+offset_top = 24.0
+offset_right = 240.0
+offset_bottom = 48.0
+text = "MP --/--"
+
+[node name="MessageLabel" type="Label" parent="Root"]
+offset_left = 16.0
+offset_top = 120.0
+offset_right = 624.0
+offset_bottom = 170.0
+autowrap_mode = 2
+text = "A wild enemy appears!"
+
+[node name="CommandMenu" type="VBoxContainer" parent="Root"]
+offset_left = 460.0
+offset_top = 180.0
+offset_right = 624.0
+offset_bottom = 352.0
+
+[node name="AttackButton" type="Button" parent="Root/CommandMenu"]
+text = "Attack"
+
+[node name="SkillButton" type="Button" parent="Root/CommandMenu"]
+text = "Skill"
+
+[node name="ItemButton" type="Button" parent="Root/CommandMenu"]
+text = "Item"
+
+[node name="DefendButton" type="Button" parent="Root/CommandMenu"]
+text = "Defend"
+
+[node name="RunButton" type="Button" parent="Root/CommandMenu"]
+text = "Run"
+
+[node name="SkillMenu" type="VBoxContainer" parent="Root"]
+visible = false
+offset_left = 460.0
+offset_top = 180.0
+offset_right = 624.0
+offset_bottom = 352.0
+
+[node name="BackButton" type="Button" parent="Root/SkillMenu"]
+text = "Back"

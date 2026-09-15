@@ -1,8 +1,9 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/cinderfall_woods.gd" id="1"]
 [ext_resource type="TileSet" path="res://art/tiles/world_tileset.tres" id="2"]
 [ext_resource type="Script" path="res://scripts/world/map_transition_area.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/world/encounter_trigger.gd" id="4"]
 
 [sub_resource type="RectangleShape2D" id="RectShape_door"]
 size = Vector2(32, 32)
@@ -45,3 +46,54 @@ offset_top = 28.0
 offset_right = 400.0
 offset_bottom = 60.0
 text = "a side path leads north"
+
+[node name="EncounterEmberWisp" type="Area2D" parent="."]
+position = Vector2(400, 176)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("4")
+encounter_id = "ember_wisp_encounter"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="EncounterEmberWisp"]
+shape = SubResource("RectShape_door")
+
+[node name="Marker" type="ColorRect" parent="EncounterEmberWisp"]
+offset_left = -6.0
+offset_top = -6.0
+offset_right = 6.0
+offset_bottom = 6.0
+color = Color(0.9, 0.55, 0.1, 1)
+
+[node name="EncounterBrambleHusk" type="Area2D" parent="."]
+position = Vector2(528, 176)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("4")
+encounter_id = "bramble_husk_encounter"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="EncounterBrambleHusk"]
+shape = SubResource("RectShape_door")
+
+[node name="Marker" type="ColorRect" parent="EncounterBrambleHusk"]
+offset_left = -6.0
+offset_top = -6.0
+offset_right = 6.0
+offset_bottom = 6.0
+color = Color(0.9, 0.55, 0.1, 1)
+
+[node name="EncounterCinderWraith" type="Area2D" parent="."]
+position = Vector2(304, 80)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("4")
+encounter_id = "cinder_wraith_encounter"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="EncounterCinderWraith"]
+shape = SubResource("RectShape_door")
+
+[node name="Marker" type="ColorRect" parent="EncounterCinderWraith"]
+offset_left = -8.0
+offset_top = -8.0
+offset_right = 8.0
+offset_bottom = 8.0
+color = Color(0.8, 0.1, 0.1, 1)

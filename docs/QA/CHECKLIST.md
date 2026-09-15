@@ -2,6 +2,33 @@
 
 Owner: Agent 9 (QA)
 
+## Exit criteria for Phase 2 (Combat) — manual, needs a display
+
+Not yet run against this build (see the limitation note at the bottom).
+
+- [ ] Walking into each of the 3 encounter markers in Cinderfall Woods
+      starts a battle against the expected enemy (Ember Wisp / Bramble
+      Husk in the corridor, Cinder Wraith in the branch alcove).
+- [ ] Attack, Skill, Defend, and Run all do something visible and
+      correct; Item reports "No items to use" without ending the turn.
+- [ ] The Skill submenu shows all 3 player skills with correct MP
+      costs, and Back returns to the main command menu without
+      spending a turn.
+- [ ] Trying a skill with insufficient MP is rejected with a message
+      and doesn't consume MP or end the turn.
+- [ ] HP/MP bars (text) update immediately after every action, for
+      both the player and the enemy.
+- [ ] Winning shows the correct XP/gold and returns to Cinderfall
+      Woods after a short pause.
+- [ ] Losing shows a defeat message and returns to Waymark with HP/MP
+      restored.
+- [ ] Running succeeds against Ember Wisp/Bramble Husk and is refused
+      (with a message) against the Cinder Wraith.
+- [ ] Command buttons are disabled (not clickable) during the enemy's
+      turn and re-enable once control returns to the player.
+- [ ] No script errors appear in the debug console during a full
+      battle from start to victory or defeat.
+
 ## Exit criteria for Phase 1 (Movement + World) — manual, needs a display
 
 These require actually opening the project in the Godot 4.3 editor and

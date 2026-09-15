@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "cinder_wraith"
+display_name = "Cinder Wraith"
+family = "cinder"
+max_hp = 45
+attack = 8
+defense = 4
+magic_power = 5
+speed = 5
+xp_reward = 25
+gold_reward = 15
+skill_ids = Array[String](["cinder_wraith_cinder_burst"])
+loot_table_id = ""

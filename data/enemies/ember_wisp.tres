@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "ember_wisp"
+display_name = "Ember Wisp"
+family = "cinder"
+max_hp = 14
+attack = 4
+defense = 1
+magic_power = 3
+speed = 6
+xp_reward = 6
+gold_reward = 3
+skill_ids = Array[String](["ember_wisp_spark"])
+loot_table_id = ""

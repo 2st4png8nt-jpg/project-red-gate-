@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Project Red Gate
 
 Owner: Lead / Architect
-Status: Phase 1 (Movement + World)
+Status: Phase 2 (Combat)
 
 This document is the technical source of truth. It describes how the
 systems fit together and where the boundaries between agent-owned areas
@@ -61,8 +61,9 @@ data/                 Content, as .tres Resource files (data-driven, no logic)
   characters/         Agent 3 (base player stat block)
   maps/               Agent 4 (map metadata: id, display name, exits, encounter table id)
   gates/              Agent 4 (keyword pool + combination table)
+  skills/             Agent 2 (player + enemy SkillData rows)
   enemies/            Agent 6
-  encounters/         Agent 6 (loot tables, spawn tables)
+  encounters/         Agent 6 (single-enemy EncounterData rows; loot tables are Phase 4)
 
 art/                  Agent 7: sprites, tiles, UI art (placeholders acceptable)
 assets/               Agent 7: misc non-code assets
@@ -187,21 +188,59 @@ in `_ready()`, then instantiates `Player` at its `PlayerSpawn` marker
 and calls `set_camera_limits()`. Any new map (normal or special) should
 follow this same shape.
 
-## 6. Combat Interface Contract (established now so Agent 2 and Agent 3
-can work in parallel later — see CLAUDE.md Section 31)
+## 6. Combat Interface Contract (Phase 2 — implemented)
 
-Combat (`scripts/combat/`) must consume, not own:
-- `PlayerData` (stats, current equipment, skills) from `scripts/rpg/`
-- `EnemyData` (stats, abilities) from `scripts/data/` + `/data/enemies/`
-- `EquipmentData` effects, applied as modifiers to base stats
+Combat (`scripts/combat/battle_manager.gd`, `BattleManager`) consumes,
+not owns:
+- `PlayerData` (`GameState.player` directly — Combat does not copy it)
+- `EnemyData` + its `SkillData` (loaded via `DataLoader` from
+  `data/enemies/` and `data/skills/`, keyed by `EncounterData.enemy_id`)
+- `EquipmentData` effects are **not yet applied** in damage math —
+  equipment bonuses land in Phase 3/4 alongside the inventory system.
 
-Combat exposes (future phase, documented here so the shape is fixed
-before two agents build against it):
-- `BattleManager.start_battle(encounter_id: String)`
-- signals: `battle_won`, `battle_lost`, `battle_action_resolved(result)`
+One `BattleManager` instance lives at the root of `scenes/combat/Battle.tscn`
+(not an autoload — a fresh instance per battle). It reads
+`GameState.pending_encounter_id` (set by `SceneManager.go_to_battle()`)
+in **`_enter_tree()`, not `_ready()`**: Godot runs a node's `_ready()`
+after all of its children's `_ready()` calls, so if `BattleManager`
+initialized `enemy`/`player` in its own `_ready()`, its child `BattleUI`
+would read them as still-null during `BattleUI._ready()`. `_enter_tree()`
+runs top-down (parent before children), so state is guaranteed set
+before any child reads it. (Caught by the Phase 2 headless self-test —
+see PROGRESS.md.)
 
-UI (`scripts/ui/`) reads battle state via these signals/state, never
-mutates combat internals directly.
+Exposed API (UI calls these, never touches damage math directly):
+- `start_battle(encounter_id: String)`
+- `player_attack()`, `player_use_skill(skill: SkillData)`,
+  `player_use_item()`, `player_defend()`, `player_run()`
+
+Exposed signals (UI reads state only through these plus the public
+`enemy` / `enemy_hp` / `player` fields):
+- `turn_state_changed(state_name: String)` — `"player_input"`,
+  `"resolving"`, `"enemy_turn"`, `"won"`, `"lost"`, `"fled"`
+- `action_resolved(message: String)` — one line for the message log
+- `hp_mp_changed` — a generic "redraw stat bars" ping
+- `battle_won(xp: int, gold: int, leveled_up: bool)`,
+  `battle_lost`, `battle_fled`
+
+Damage formulas (deliberately simple — see GAME_DESIGN.md Section 27,
+balance from playtesting, not a spreadsheet up front):
+- Basic attack: `max(1, attacker.attack - defender.defense)`
+- Skill (non-self): `max(1, skill.power + attacker.magic_power - defender.defense)`
+- Skill (`target_type == "self"`): heals `skill.power` HP, no defense involved
+- Defending halves the next hit taken (integer division), one-shot flag
+  cleared after it's used once
+- Enemies always use `skill_ids[0]` if they have one, else basic attack
+  — no enemy AI variety yet (Phase 2 scope)
+
+`Leveling` (`scripts/rpg/leveling.gd`, Agent 3) is a static, placeholder
+XP curve (`xp_to_next_level(level) = level * 20`) called from
+`BattleManager._win()`. Full balancing is Phase 3/4.
+
+UI (`scripts/ui/battle_ui.gd` + `scenes/ui/BattleUI.tscn`, Agent 5)
+reads battle state via the signals/fields above and drives the command
+menu; it contains no combat math and never mutates `BattleManager`
+fields directly.
 
 ## 7. Gate Resolution Contract
 

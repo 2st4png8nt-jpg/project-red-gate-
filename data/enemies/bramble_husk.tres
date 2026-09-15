@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "bramble_husk"
+display_name = "Bramble Husk"
+family = "cinder"
+max_hp = 20
+attack = 6
+defense = 3
+magic_power = 0
+speed = 3
+xp_reward = 8
+gold_reward = 4
+skill_ids = Array[String](["bramble_husk_thorn_whip"])
+loot_table_id = ""

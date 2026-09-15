@@ -7,6 +7,100 @@ Section 28).
 
 ---
 
+## 2026-09-15 — Phase 2: Combat established
+
+STATUS: COMPLETE
+
+IMPLEMENTED:
+- `BattleManager` (`scripts/combat/battle_manager.gd`): full state
+  machine — `start_battle()`, `player_attack()`, `player_use_skill()`,
+  `player_use_item()`, `player_defend()`, `player_run()`, enemy turn
+  resolution, victory/defeat/flee. One instance per `Battle.tscn`, not
+  an autoload.
+- `EncounterData` schema + 3 single-enemy encounters (Ember Wisp,
+  Bramble Husk, Cinder Wraith mini-boss — the last with `can_flee = false`).
+- `EnemyData` rows for all three, each with one `SkillData` (enemies
+  always use their first skill; no AI variety yet, by design for Phase 2).
+- 3 player skills (Ember Slash, Guard Break, Second Wind) as `SkillData`
+  rows in the new `data/skills/` content folder.
+- `Leveling` (`scripts/rpg/leveling.gd`): minimal placeholder XP curve,
+  applies stat increases and a full heal on level-up.
+- `BattleUI` (`scripts/ui/battle_ui.gd` + `scenes/ui/BattleUI.tscn`):
+  command menu, skill submenu, HP/MP display, message log, and the
+  post-battle transition back to the world.
+- `EncounterTrigger` + three placements in Cinderfall Woods (two common
+  enemies in the corridor, the mini-boss in the branch alcove), each
+  with a small colored marker for visibility during playtesting.
+- `SceneManager.go_to_battle()` implemented for real (was a stub).
+
+FILES CHANGED: see this milestone's commit.
+
+INTERFACES CHANGED:
+- New Combat Interface Contract finalized in ARCHITECTURE.md Section 6
+  (signals, `player_*()` methods, damage formulas).
+- `GameState.pending_encounter_id` added (battle-only, not saved).
+- `EncounterData` schema added to the fixed schema list.
+
+TESTS:
+- `godot4 --headless --path . --quit-after 10`: Boot -> Town, no
+  runtime errors. Also re-verified Cinderfall Woods (now with 3
+  encounter triggers) still boots cleanly.
+- Temporary self-test (removed before commit, same pattern as prior
+  phases) drove a real `Battle.tscn` instance through:
+  - a full attack round: `player_attack()` dealt the expected
+    `attack - defense` damage, then after the enemy-turn delay the
+    enemy's skill dealt its expected damage back and state correctly
+    returned to `PLAYER_INPUT`;
+  - a direct win: `battle_won` fired with the exact enemy's
+    `xp_reward`/`gold_reward`, and `GameState.player`'s gold/xp updated
+    accordingly;
+  - a direct loss: `battle_lost` fired and the player was restored to
+    full HP/MP (the documented placeholder defeat behavior);
+  - the Cinder Wraith's flee block: `player_run()` correctly refused
+    and left state at `PLAYER_INPUT`.
+- **Real bug found and fixed by this testing, not just a clean pass:**
+  `BattleManager` originally called `start_battle()` in `_ready()`.
+  Godot calls a node's `_ready()` only after all of its children's
+  `_ready()` calls have already run, so `BattleUI` (a child of
+  `BattleManager` in `Battle.tscn`) was reading `battle_manager.enemy`
+  as still-null inside its own `_ready()` — every real battle would
+  have logged a script error and shown a blank enemy name/HP on the
+  very first frame. Fixed by moving the read of
+  `GameState.pending_encounter_id` into `_enter_tree()`, which Godot
+  runs top-down (parent before children) rather than bottom-up. See
+  ARCHITECTURE.md Section 6 for the explanation kept in the code comment.
+- Learned mid-testing that `--quit-after N` counts **frames, not
+  seconds** — an early run of this same self-test with `--quit-after 15`
+  exited before a 0.8s in-battle timer could fire, and looked like a
+  false pass/fail rather than "test didn't run long enough." Noted here
+  so the next phase's self-test doesn't repeat the mistake.
+
+KNOWN ISSUES:
+- Equipment bonuses are not yet applied to combat stats (Phase 3/4 —
+  there is no equipment to grant yet either).
+- Item command is present in the menu but always reports "No items to
+  use" since the inventory system doesn't exist yet (Phase 3/4).
+- No enemy AI variety — every enemy always uses its one skill, never a
+  basic attack or a defensive action.
+- No animation/feedback beyond text messages and HP number changes —
+  "combat feedback" polish (screen shake, hit flash, etc.) is later.
+- Defeat has no real penalty (full heal, return to Waymark) — a
+  deliberate placeholder so a solo playtester never gets soft-locked;
+  revisit once there's something worth losing.
+- As with Phase 1, this was validated headlessly and via targeted
+  logic self-tests, not by clicking through a real window — button
+  layout, readability, and pacing (are the 0.6s/1.2s delays too slow
+  or too fast?) need a real playtest pass in the Godot editor.
+
+FOLLOW-UP (Phase 3 — Progression):
+- Real inventory: pick up/use items, item command actually works.
+- Equipment comparison and stat application (weapon/armor/accessory
+  bonuses flowing into `BattleManager`'s damage formulas).
+- Currency sinks (Waymark shop).
+- STOP AND TEST before Phase 4.
+
+---
+
 ## 2026-09-15 — Phase 1: Movement + World established
 
 STATUS: COMPLETE
