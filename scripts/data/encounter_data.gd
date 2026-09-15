@@ -7,3 +7,5 @@ class_name EncounterData
 @export var id: String = ""
 @export var enemy_id: String = ""
 @export var can_flee: bool = true
+@export var level: int = 1 # scales the enemy via EnemyScaler; 1 = no change (default for all hand-authored rows)
+@export var loot_table_id_override: String = "" # if set, used instead of the enemy's own loot_table_id (generated dungeons)

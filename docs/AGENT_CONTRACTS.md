@@ -58,11 +58,13 @@ Does not own combat UI or battle logic.
 
 Owns: `scripts/combat/`, `data/skills/`.
 
-Must consume (not redefine): `PlayerData` from Agent 3, `EnemyData` and
-`LootTableData` from Agent 6, equipment effects from Agent 3 (via
-`StatsCalculator`, wired in Phase 3). Exposes the interface in
-ARCHITECTURE.md Section 6/6b. Does not own inventory UI or the command
-menu itself (Agent 5) — only the state machine those UI elements drive.
+Must consume (not redefine): `PlayerData` from Agent 3, `EnemyData`,
+`LootTableData` and `EnemyScaler` from Agent 6, `DungeonProfile`-derived
+`EncounterData` built by Agent 4's `GeneratedEncounterTrigger`,
+equipment effects from Agent 3 (via `StatsCalculator`, wired in Phase 3).
+Exposes the interface in ARCHITECTURE.md Section 6/6b/7a. Does not own
+inventory UI or the command menu itself (Agent 5) — only the state
+machine those UI elements drive.
 
 Delivered in Phase 2:
 - `BattleManager` (`scripts/combat/battle_manager.gd`) — full state
@@ -84,6 +86,22 @@ Delivered in Phase 4:
   Section 6b. `battle_won`'s signature grew two params
   (`loot_item_name`, `clue_discovered`); `BattleUI`'s handler was
   updated to match.
+
+Delivered in Phase 5:
+- Every stat read from `EnemyData` in combat math now goes through
+  `EnemyScaler` (Agent 6) instead of the raw field, keyed by a new
+  `enemy_level` field set from `EncounterData.level` — 1 for every
+  hand-authored Phase 2-4 row (no behavior change for those), whatever
+  a generated dungeon's `DungeonProfile.level` computed otherwise.
+- `_enter_tree()` now checks `GameState.pending_generated_encounter`
+  (an in-memory `EncounterData`, Agent 4) before falling back to the
+  file-based `pending_encounter_id` path — both converge on the same
+  `_start_with_encounter()`.
+- `EquipmentData.bonus_damage_vs_family`/`bonus_damage_percent`/
+  `mp_restore_on_kill` (Agent 3 schema, Agent 2 combat math) — Cindermourn's
+  identity mechanics, see ARCHITECTURE.md Section 6.
+- `EncounterData` gained `level: int` and `loot_table_id_override: String`
+  (both additive/backward-compatible — see AGENT_CONTRACTS.md schema list).
 
 ## AGENT 3 — RPG / Gear
 
@@ -123,6 +141,17 @@ Delivered in Phase 3:
   stub that only reported "no items"): uses the first consumable in
   the inventory, heals it, removes it.
 
+Delivered in Phase 5:
+- `EquipmentData` gained 3 structured fields — `bonus_damage_vs_family`,
+  `bonus_damage_percent`, `mp_restore_on_kill` — for effects common
+  enough to deserve real fields rather than parsing the existing
+  opaque `special_effect_id` string. See AGENT_CONTRACTS.md's Open
+  Interface Decisions Log for why.
+- `data/items/cindermourn.tres`: the unique weapon, using all 3 new
+  fields. Content-wise this sits in Agent 3's `data/items/`, same as
+  every other equipment piece, even though it's exclusively awarded
+  through Agent 6's Ashen Warden loot table.
+
 ## AGENT 4 — World / Gate
 
 Owns: `scripts/world/`, `scripts/gates/`, `data/maps/`, `data/gates/`.
@@ -155,12 +184,10 @@ Delivered in Phase 1:
   with real pixel art later without touching `RectMapBuilder` or any
   map controller).
 
-Gate resolution logic itself (`gate_resolver.gd`) is data-driven and
-scheduled for Phase 5, but its schema and contract are fixed now
-(ARCHITECTURE.md Section 7) so nothing downstream has to guess. Normal
-maps are currently entered through a plain `MapTransitionArea` doorway
-in Town — Phase 5 replaces that doorway's trigger with real Gate
-combination entry (the destination logic does not change).
+Gate resolution logic itself (`gate_resolver.gd`) is data-driven — see
+ARCHITECTURE.md Section 7. Phase 1-4 entered Cinderfall Woods through a
+plain `MapTransitionArea` doorway in Town; Phase 5 replaced that
+doorway's trigger with real Gate combination entry through `GateUI`.
 
 Delivered in Phase 2:
 - `EncounterTrigger` (`scripts/world/encounter_trigger.gd`) — one-shot
@@ -180,6 +207,35 @@ Delivered in Phase 3:
   walk-in trigger (unlike `EncounterTrigger`, no one-shot guard: you
   can browse a shop as many times as you like) opening the Waymark
   shop, placed in Town.
+
+Delivered in Phase 5:
+- `GateResolver` + `DungeonProfile` (`scripts/gates/`) — see
+  ARCHITECTURE.md Section 7/7a for the full contract. Removed the dead
+  `data/gates/combinations/silent_marsh.tres` and `data/maps/silent_marsh.tres`
+  rows (that combo was never built as a real scene; it now generates a
+  Drowned-themed dungeon like any other combination — see GAME_DESIGN.md
+  Section 7's design-supersession note).
+- `GeneratedDungeon.tscn`/`generated_dungeon.gd` — the runtime-built
+  map for any `GENERATED` Gate result, plus 2 new reusable props:
+  `DoorwayTrigger.tscn` (a `MapTransitionArea` with no map-specific
+  scene of its own) and `GeneratedEncounterMarker.tscn` (wraps
+  `GeneratedEncounterTrigger`). Both exist so `generated_dungeon.gd`
+  never has to dynamically attach a script to a bare `Area2D.new()` at
+  runtime (fragile, and inconsistent with every other trigger in the
+  project, which is a pre-authored scene) — it just instances and
+  configures them like any other prefab.
+- `GateTrigger` (`scripts/world/gate_trigger.gd`) — replaces
+  `ToCinderfallWoods`'s `MapTransitionArea` in Town with a trigger that
+  opens `GateUI` (Agent 5) instead of transitioning directly.
+- `RedGate.tscn`/`red_gate.gd` — the Red Gate's hand-crafted map (not
+  generated — see GAME_DESIGN.md Section 7), reusing the existing
+  `EncounterTrigger` (file-based, `ashen_warden_encounter.tres`) rather
+  than the new generated-dungeon machinery, since this is one fixed,
+  designed destination, not a formula.
+- New `art/tiles/`: `tile_verdant.svg`, `tile_drowned.svg`,
+  `tile_hollow.svg` (the 3 remaining Origin themes) and
+  `tile_redgate.svg`, all added as new sources in the shared
+  `world_tileset.tres` (ids 3-6) rather than per-theme tileset files.
 
 ## AGENT 5 — UI / UX
 
@@ -213,6 +269,18 @@ Delivered in Phase 4:
   Reads `EquipmentData` bonus fields directly via `Resource.get(field)`;
   does not duplicate `StatsCalculator`'s logic.
 
+Delivered in Phase 5:
+- `GateUI` (`scripts/ui/gate_ui.gd` + `scenes/ui/GateUI.tscn`) — the
+  payoff screen: 3 `OptionButton`s populated from `data/gates/keywords/`
+  (data-driven, no hardcoded word list in the script), calls
+  `GateResolver.resolve()` on Open Gate, and branches on the result
+  type to call `SceneManager.go_to_map()` (known/special) or
+  `go_to_generated_dungeon()` (generated) — never builds a dungeon
+  itself. Also shows every discovered clue's hint text, looked up from
+  `data/gates/clues/*.tres` (Agent 4) by id. Instanced by `town.gd` and
+  opened by the new `GateTrigger`, replacing the old direct-to-Cinderfall-
+  Woods doorway.
+
 ## AGENT 6 — Enemy / Content
 
 Owns: `data/enemies/`, `data/encounters/`, `data/loot/`, `scripts/enemies/`.
@@ -227,8 +295,12 @@ Delivered in Phase 2:
   delivery for the skill rows themselves).
 - `EncounterData` rows pairing each enemy into a single-enemy
   encounter; the Cinder Wraith's has `can_flee = false`.
-- Silent Marsh's enemies (Tideling, Hollow Stalker) are deferred until
-  that map is actually built — no content without a place to use it.
+- Silent Marsh's enemies (Tideling, Hollow Stalker) are deferred
+  indefinitely — Silent Marsh as a distinct hand-authored map is
+  superseded by Phase 5's generation system (GAME_DESIGN.md Section 7),
+  so there is no longer a specific place these would need to go; a
+  future "add real per-Origin monster variety to generated dungeons"
+  pass could revive the concept, but nothing calls for it yet.
 
 Delivered in Phase 4:
 - `LootTableData` schema + `LootRoller` (`scripts/enemies/loot_roller.gd`,
@@ -249,6 +321,24 @@ Delivered in Phase 4:
 - `scripts/enemies/` now holds `loot_roller.gd`; still no per-enemy
   behavior scripts beyond "use `skill_ids[0]`" — not needed until enemy
   AI grows beyond Phase 2's single-skill default.
+
+Delivered in Phase 5:
+- `EnemyScaler` (`scripts/enemies/enemy_scaler.gd`, static) — see
+  ARCHITECTURE.md Section 7a. Computes scaled stats without mutating
+  the shared cached `EnemyData` resource (would corrupt every other
+  battle using that same enemy).
+- The Ashen Warden: `EnemyData` (family `"ashen"`, 70 HP, the
+  prototype's hardest fight), its `Ashfall` skill, and
+  `ashen_warden_loot.tres` (100% chance, guaranteed Cindermourn) — the
+  content half of the Red Gate; Agent 4 owns the map it lives in.
+- `ashen_warden_encounter.tres` — a normal file-based `EncounterData`
+  (not the generated-dungeon machinery), since the Red Gate is one
+  fixed destination, not a formula.
+- `generated_low_loot.tres`/`generated_mid_loot.tres`/`generated_high_loot.tres`
+  — the 3 level-tiered loot tables generated dungeons roll from
+  (`generated_mid_loot` mirrors `cinderfall_common_loot`'s values but
+  is its own file, to keep generated-dungeon loot content separate
+  from Cinderfall-Woods-specific naming).
 
 ## AGENT 7 — Art / Presentation
 
@@ -299,8 +389,11 @@ ARCHITECTURE.md Section 8 save-data notes if it affects save data).
 - `speed_bonus: int`
 - `max_hp_bonus: int`
 - `max_mp_bonus: int`
-- `special_effect_id: String` — empty string if none; combat reads this
-  by id, it never contains logic itself
+- `special_effect_id: String` — reserved for future one-off/scripted
+  effects; empty for every current item
+- `bonus_damage_vs_family: String` — added Phase 5; matches `EnemyData.family`, empty = no bonus
+- `bonus_damage_percent: float` — added Phase 5; e.g. `0.15` = +15% damage vs. that family
+- `mp_restore_on_kill: int` — added Phase 5
 
 ### `SkillData` (scripts/data/skill_data.gd)
 - `id: String`
@@ -333,12 +426,17 @@ ARCHITECTURE.md Section 8 save-data notes if it affects save data).
 - `origin: String`
 - `tone: String`
 - `sign: String`
-- `result_type: String` — one of `"known" | "special" | "locked"`
-  (anything not listed resolves to `"unknown"` at runtime, and
-  malformed input to `"invalid"` — those two are never stored as rows)
-- `destination_map_id: String` — empty for `"special"` rows, which
-  instead resolve to the hardcoded Red Gate map id in the resolver
-  contract, not duplicated per-row
+- `result_type: String` — one of `"known" | "special"` (Phase 5: a
+  triple that doesn't match any row here, but is otherwise well-formed,
+  now resolves to `GENERATED` — see ARCHITECTURE.md Section 7 — rather
+  than `"unknown"`; malformed input still resolves to `"invalid"` and
+  is never stored as a row; `"locked"` was in the original Phase 0
+  enum but is unused and removed — every catalogued row is always
+  reachable)
+- `destination_map_id: String` — set on both `"known"` and `"special"`
+  rows (the Red Gate's own row carries `"red_gate"` here directly,
+  rather than the resolver hardcoding it — simpler than the two-rows-
+  need-different-treatment plan originally sketched in Phase 0)
 
 ### `MapData` (scripts/data/map_data.gd)
 - `id: String`
@@ -354,6 +452,16 @@ See Agent 3 section above for the full field list.
 - `id: String`
 - `enemy_id: String`
 - `can_flee: bool`
+- `level: int` — added Phase 5; scales the enemy via `EnemyScaler`. Defaults to
+  1 (no change) — every hand-authored Phase 2-4 row is unaffected.
+- `loot_table_id_override: String` — added Phase 5; if set, used instead
+  of the enemy's own `loot_table_id` (generated dungeons, whose loot
+  tier depends on dungeon level, not the fixed enemy)
+
+### `GateClueData` (scripts/data/gate_clue_data.gd) — added Phase 5
+- `id: String`
+- `hint_text: String` — player-facing; `GameState.known_gate_clues`
+  only ever stores the opaque id, `GateUI` looks up this text to display
 
 ### `ConsumableData extends ItemData` (scripts/data/consumable_data.gd) — added Phase 3
 - `heal_hp: int`
@@ -372,10 +480,12 @@ See Agent 3 section above for the full field list.
 Record any ambiguity resolved by the Lead Agent here, so no other agent
 re-litigates it (CLAUDE.md Section 19).
 
-- **2026-09-15** — Decided the Red Gate's destination map id is fixed
-  (`"red_gate"`) rather than stored per-combination-row, since there is
-  exactly one special destination in the prototype. Revisit only if a
-  second special map is added.
+- **2026-09-15 (Phase 0)** — Decided the Red Gate's destination map id
+  is fixed (`"red_gate"`) rather than stored per-combination-row.
+  **Superseded in Phase 5**: the row stores `destination_map_id` for
+  both `"known"` and `"special"` types uniformly — simpler than
+  special-casing the resolver, and no real cost since there is still
+  only ever one special row.
 - **2026-09-15** — Decided equipment bonuses are computed on read
   (`StatsCalculator`) rather than applied by mutating `PlayerData`'s
   base stats when a piece is equipped/unequipped. Mutate-on-equip would
@@ -384,3 +494,35 @@ re-litigates it (CLAUDE.md Section 19).
   future loot auto-equip) — a single source of truth for "what does
   this player currently have equipped" is worth the extra function
   calls in hot paths like `BattleManager`.
+- **2026-09-15 (Phase 5)** — Decided every well-formed Gate combination
+  should generate a real destination, not resolve to "Unknown" unless
+  specifically catalogued (the original Phase 0 plan). Requested
+  explicitly by the project owner, matching the *.hack*-inspired brief:
+  the mystery is in not knowing which words to pick, not in the game
+  refusing combinations it doesn't recognize. This removed the
+  `UNKNOWN`/`LOCKED` `GateResolver` results and the `"locked"` value
+  from `GateCombinationData.result_type`'s enum.
+- **2026-09-15 (Phase 5)** — Decided a generated dungeon's physical
+  layout comes from one of 4 fixed templates (chosen by `branch_tier`),
+  not a unique randomly-generated maze per word combination. This
+  sandbox has no display, so a broken random layout (unreachable
+  branch, sealed spawn) could only be caught logically, not by eye — a
+  small fixed set of pre-verified templates keeps every generable
+  dungeon provably reachable (see the Phase 5 BFS self-test in
+  PROGRESS.md) while the words still control level, theme, and loot.
+  Revisit if/when a human has verified template variety looks
+  repetitive in actual play.
+- **2026-09-15 (Phase 5)** — Decided Cindermourn's specific effects
+  (bonus damage vs. a family, MP restore on kill) get dedicated
+  `EquipmentData` fields rather than being encoded into the existing
+  `special_effect_id` string and parsed. These are reusable, structured
+  mechanics (a future item could easily want "bonus vs. family X" too);
+  `special_effect_id` remains for genuinely one-off effects that
+  wouldn't justify a dedicated field.
+- **2026-09-15 (Phase 5)** — Decided generated dungeons reuse the
+  existing 2 common enemies (scaled by `EnemyScaler`) rather than
+  authoring unique monsters per Origin theme. CLAUDE.md scopes the
+  whole prototype to "3-5 enemy types"; 4 Origins x however many
+  Tone/Sign combinations would blow well past that for content that's
+  mostly reused stat blocks anyway. Revisit only after the vertical
+  slice is proven fun and more content is explicitly in scope.

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="LootTableData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/loot_table_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "generated_high_loot"
+drop_chance = 0.75
+item_ids = Array[String](["cinderfall_cleaver", "ashcinder_guard"])
+weights = Array[int]([3, 1])

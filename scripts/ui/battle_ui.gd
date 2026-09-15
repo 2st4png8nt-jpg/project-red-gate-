@@ -52,7 +52,8 @@ func _ready() -> void:
 	_refresh_stats()
 
 func _refresh_stats() -> void:
-	enemy_hp_label.text = "HP %d/%d" % [battle_manager.enemy_hp, battle_manager.enemy.max_hp]
+	var enemy_max_hp := EnemyScaler.max_hp(battle_manager.enemy, battle_manager.enemy_level)
+	enemy_hp_label.text = "HP %d/%d" % [battle_manager.enemy_hp, enemy_max_hp]
 	player_hp_label.text = "HP %d/%d" % [battle_manager.player.hp, StatsCalculator.effective_max_hp(battle_manager.player)]
 	player_mp_label.text = "MP %d/%d" % [battle_manager.player.mp, StatsCalculator.effective_max_mp(battle_manager.player)]
 
@@ -92,7 +93,7 @@ func _on_battle_won(xp: int, gold: int, leveled_up: bool, loot_item_name: String
 	var clue_text := " A note falls from the wreckage..." if clue_discovered else ""
 	message_label.text = "Victory! +%d XP, +%d gold.%s%s%s" % [xp, gold, loot_text, clue_text, extra]
 	await get_tree().create_timer(1.2).timeout
-	SceneManager.go_to_map(GameState.current_map_id)
+	SceneManager.go_to_current_map()
 
 func _on_battle_lost() -> void:
 	command_menu.hide()
@@ -105,4 +106,4 @@ func _on_battle_fled() -> void:
 	command_menu.hide()
 	skill_menu.hide()
 	await get_tree().create_timer(0.6).timeout
-	SceneManager.go_to_map(GameState.current_map_id)
+	SceneManager.go_to_current_map()

@@ -2,6 +2,45 @@
 
 Owner: Agent 9 (QA)
 
+## Exit criteria for Phase 5 (Gates) — manual, needs a display
+
+Not yet run against this build.
+
+- [ ] Walking into the Gate cluster in Waymark opens `GateUI` and
+      pauses player movement; Close resumes movement without leaving Town.
+- [ ] All 3 dropdowns list exactly the 4 words from their category
+      (Origin/Tone/Sign), with a "— choose —" placeholder.
+- [ ] Trying Open Gate with fewer than 3 words chosen shows "Choose all
+      three words first" and does nothing else.
+- [ ] `Hollow + Undying + Ember` shows the Red Gate flavor text and
+      transitions to a distinctly red/black-tiled map.
+- [ ] `Cinder + Broken + Ember` transitions to the existing Cinderfall
+      Woods (unchanged from Phase 1-4).
+- [ ] Any other well-formed combination (e.g. `Verdant + Forgotten + Tide`)
+      transitions to a generated dungeon whose floor tiles match the
+      Origin word's theme and whose title bar names the level correctly.
+- [ ] Trying the same generated combination twice in a row (or leaving
+      and re-entering via a fight) produces the *same* dungeon each
+      time — not a different random layout.
+- [ ] A higher-Tone-word dungeon (e.g. `Undying`) visibly has tougher
+      enemies (more HP, hits harder) than a `Silent` one.
+- [ ] A higher-Sign-word dungeon (`Umbra`) has visibly more branches
+      than a lower one (`Ember`).
+- [ ] Fighting in a generated dungeon and winning/losing/fleeing
+      correctly returns to that same generated dungeon (not Town, not
+      a blank/frozen screen) — this exercises the bug fixed in
+      PROGRESS.md's Phase 5 entry.
+- [ ] The Ashen Warden fight in the Red Gate: can't be fled, and
+      defeating it drops Cindermourn every time.
+- [ ] Equipping Cindermourn and re-fighting the Ashen Warden (if
+      possible) or another `"ashen"`-family enemy shows visibly higher
+      damage than an unequipped hit would.
+- [ ] Discovered clues (from defeating the Cinder Wraith) show their
+      hint text in the Gate UI, not just a raw id string.
+- [ ] No script errors appear in the console across opening the Gate UI,
+      trying an invalid word set, entering a generated dungeon, fighting
+      there, and returning.
+
 ## Exit criteria for Phase 4 (Loot) — manual, needs a display
 
 Not yet run against this build.

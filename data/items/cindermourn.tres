@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EquipmentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/equipment_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "cindermourn"
+display_name = "Cindermourn"
+description = "A blade quenched in the Red Gate's dying light. It remembers what it was forged from."
+rarity = "unique"
+level_requirement = 0
+value = 250
+source = "Ashen Warden drop"
+slot = "weapon"
+attack_bonus = 35
+bonus_damage_vs_family = "ashen"
+bonus_damage_percent = 0.15
+mp_restore_on_kill = 5

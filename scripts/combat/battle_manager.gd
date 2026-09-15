@@ -18,9 +18,11 @@ enum State { PLAYER_INPUT, RESOLVING, ENEMY_TURN, WON, LOST, FLED }
 var state: State = State.PLAYER_INPUT
 var player: PlayerData
 var enemy: EnemyData
+var enemy_level: int = 1
 var enemy_hp: int
 var can_flee: bool = true
 var player_defending: bool = false
+var current_encounter: EncounterData # kept for loot_table_id_override — see _win()
 
 func _enter_tree() -> void:
 	# Deliberately _enter_tree(), not _ready(): Godot calls _ready() on
@@ -29,17 +31,31 @@ func _enter_tree() -> void:
 	# start_battle() waited until this node's _ready(). _enter_tree()
 	# fires top-down (parent before children), so state is guaranteed
 	# ready before any child's _ready() runs.
-	start_battle(GameState.pending_encounter_id)
+	if GameState.pending_generated_encounter != null:
+		var encounter := GameState.pending_generated_encounter
+		GameState.pending_generated_encounter = null
+		_start_with_encounter(encounter)
+	else:
+		start_battle(GameState.pending_encounter_id)
 
+## File-based path (hand-authored data/encounters/*.tres rows).
 func start_battle(encounter_id: String) -> void:
 	var encounter: EncounterData = DataLoader.load_resource("res://data/encounters/%s.tres" % encounter_id)
 	if encounter == null:
 		push_error("BattleManager: unknown encounter id '%s'" % encounter_id)
 		return
+	_start_with_encounter(encounter)
+
+## In-memory path (generated dungeons build an EncounterData at trigger
+## time — see GeneratedEncounterTrigger — rather than authoring one row
+## per possible Gate combination).
+func _start_with_encounter(encounter: EncounterData) -> void:
+	current_encounter = encounter
 	enemy = DataLoader.load_resource("res://data/enemies/%s.tres" % encounter.enemy_id)
 	can_flee = encounter.can_flee
+	enemy_level = maxi(1, encounter.level)
 	player = GameState.player
-	enemy_hp = enemy.max_hp
+	enemy_hp = EnemyScaler.max_hp(enemy, enemy_level)
 	player_defending = false
 	state = State.PLAYER_INPUT
 	turn_state_changed.emit("player_input")
@@ -47,7 +63,8 @@ func start_battle(encounter_id: String) -> void:
 func player_attack() -> void:
 	if state != State.PLAYER_INPUT:
 		return
-	var dmg := maxi(1, StatsCalculator.effective_attack(player) - enemy.defense)
+	var dmg := maxi(1, StatsCalculator.effective_attack(player) - EnemyScaler.defense(enemy, enemy_level))
+	dmg = _apply_weapon_family_bonus(dmg)
 	enemy_hp = maxi(0, enemy_hp - dmg)
 	action_resolved.emit("You attack for %d damage." % dmg)
 	_after_player_action()
@@ -64,11 +81,21 @@ func player_use_skill(skill: SkillData) -> void:
 		player.hp = mini(StatsCalculator.effective_max_hp(player), player.hp + healed)
 		action_resolved.emit("You use %s and recover %d HP." % [skill.display_name, healed])
 	else:
-		var dmg := maxi(1, skill.power + StatsCalculator.effective_magic_power(player) - enemy.defense)
+		var dmg := maxi(1, skill.power + StatsCalculator.effective_magic_power(player) - EnemyScaler.defense(enemy, enemy_level))
+		dmg = _apply_weapon_family_bonus(dmg)
 		enemy_hp = maxi(0, enemy_hp - dmg)
 		action_resolved.emit("You use %s for %d damage." % [skill.display_name, dmg])
 	hp_mp_changed.emit()
 	_after_player_action()
+
+## Cindermourn-style equipment identity (GAME_DESIGN.md Section 10): a
+## weapon can carry a flat damage percentage bonus against one specific
+## enemy family, rather than just bigger raw stats.
+func _apply_weapon_family_bonus(dmg: int) -> int:
+	var weapon := player.equipped_weapon
+	if weapon != null and weapon.bonus_damage_vs_family != "" and weapon.bonus_damage_vs_family == enemy.family:
+		return maxi(1, roundi(dmg * (1.0 + weapon.bonus_damage_percent)))
+	return dmg
 
 func player_use_item() -> void:
 	if state != State.PLAYER_INPUT:
@@ -120,10 +147,10 @@ func _enemy_turn() -> void:
 	var player_defense := StatsCalculator.effective_defense(player)
 	if enemy.skill_ids.size() > 0:
 		var skill: SkillData = DataLoader.load_resource("res://data/skills/%s.tres" % enemy.skill_ids[0])
-		dmg = maxi(1, skill.power + enemy.magic_power - player_defense)
+		dmg = maxi(1, skill.power + EnemyScaler.magic_power(enemy, enemy_level) - player_defense)
 		msg = "%s uses %s for %d damage!" % [enemy.display_name, skill.display_name, dmg]
 	else:
-		dmg = maxi(1, enemy.attack - player_defense)
+		dmg = maxi(1, EnemyScaler.attack(enemy, enemy_level) - player_defense)
 		msg = "%s attacks for %d damage!" % [enemy.display_name, dmg]
 
 	if player_defending:
@@ -144,14 +171,17 @@ func _enemy_turn() -> void:
 func _win() -> void:
 	state = State.WON
 	turn_state_changed.emit("won")
-	var xp := enemy.xp_reward
-	var gold := enemy.gold_reward
+	var xp := EnemyScaler.xp_reward(enemy, enemy_level)
+	var gold := EnemyScaler.gold_reward(enemy, enemy_level)
 	player.gold += gold
 	var leveled_up := Leveling.grant_xp(player, xp)
 
 	var loot_item_name := ""
-	if enemy.loot_table_id != "":
-		var table: LootTableData = DataLoader.load_resource("res://data/loot/%s.tres" % enemy.loot_table_id)
+	var loot_table_id := enemy.loot_table_id
+	if current_encounter != null and current_encounter.loot_table_id_override != "":
+		loot_table_id = current_encounter.loot_table_id_override
+	if loot_table_id != "":
+		var table: LootTableData = DataLoader.load_resource("res://data/loot/%s.tres" % loot_table_id)
 		var loot_id := LootRoller.roll(table)
 		if loot_id != "":
 			var item: ItemData = DataLoader.load_resource("res://data/items/%s.tres" % loot_id)
@@ -164,11 +194,20 @@ func _win() -> void:
 		GameState.discover_clue(enemy.gate_clue_id)
 		clue_discovered = true
 
+	var mp_restored := 0
+	var weapon := player.equipped_weapon
+	if weapon != null and weapon.mp_restore_on_kill > 0:
+		var mp_before := player.mp
+		player.mp = mini(StatsCalculator.effective_max_mp(player), player.mp + weapon.mp_restore_on_kill)
+		mp_restored = player.mp - mp_before
+
 	var victory_msg := "Victory! %s defeated." % enemy.display_name
 	if loot_item_name != "":
 		victory_msg += " You found %s!" % loot_item_name
 	if clue_discovered:
 		victory_msg += " A strange note falls from the wreckage..."
+	if mp_restored > 0:
+		victory_msg += " (+%d MP)" % mp_restored
 	action_resolved.emit(victory_msg)
 	battle_won.emit(xp, gold, leveled_up, loot_item_name, clue_discovered)
 

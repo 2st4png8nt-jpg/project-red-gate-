@@ -7,6 +7,170 @@ Section 28).
 
 ---
 
+## 2026-09-15 — Phase 5: Gates established
+
+STATUS: COMPLETE
+
+Substantially larger than Phases 1-4: the project owner asked, mid-Phase-5,
+for the word system to be *.hack*-inspired and genuinely generative —
+words determine map type, level, dungeon design, and loot table,
+rather than mostly resolving to "Unknown" unless specifically
+catalogued. Two scope-defining questions were asked and answered before
+building (see chat): formulaic parameters over full random layout
+generation, and every valid combination generates something over
+keeping most combinations inert. Both decisions and the reasoning are
+also recorded in AGENT_CONTRACTS.md's Open Interface Decisions Log.
+
+IMPLEMENTED:
+- `GateResolver` (`scripts/gates/gate_resolver.gd`): `SPECIAL` (Red
+  Gate) > `KNOWN` (Cinderfall Woods) > `GENERATED` (every other
+  well-formed combination) > `INVALID`, in that priority order.
+- `DungeonProfile` (`scripts/gates/dungeon_profile.gd`): pure
+  word→number math. Origin picks a floor tile theme, Tone picks a
+  level 1-4, Sign picks a branch tier 0-3 (which also picks the loot
+  tier: low/mid/high by level).
+- `GeneratedDungeon.tscn`/`generated_dungeon.gd`: builds a dungeon at
+  runtime from a `DungeonProfile` — 4 fixed layout templates by branch
+  tier (0-3 side branches), themed with `RectMapBuilder` same as every
+  other map, populated with `GeneratedEncounterTrigger`s that build an
+  `EncounterData` in memory (enemy picked from a shared pool, level and
+  loot table from the profile) since pre-authoring a row per possible
+  word combination isn't practical.
+- `EnemyScaler` (`scripts/enemies/enemy_scaler.gd`): scales an
+  `EnemyData`'s stats for a given level without mutating the shared
+  cached resource. `BattleManager` now reads every enemy stat through
+  it; `level` defaults to 1 (no change) so every Phase 2-4 hand-authored
+  encounter is provably unaffected.
+- `GateUI` (`scripts/ui/gate_ui.gd` + `scenes/ui/GateUI.tscn`): 3 word
+  dropdowns populated from `data/gates/keywords/`, resolves via
+  `GateResolver`, shows discovered clue hint text
+  (`GateClueData`/`data/gates/clues/`). Replaces the old
+  `MapTransitionArea` doorway to Cinderfall Woods in Town — reaching
+  *any* dungeon now requires figuring out the right words.
+- The Red Gate, finished properly rather than left as a dangling
+  `MapData` reference: `RedGate.tscn`/`red_gate.gd` (hand-crafted, not
+  generated — a deliberate design pillar from GAME_DESIGN.md Section
+  7), the Ashen Warden boss (family `"ashen"`, 70 HP, can't be fled
+  from), and **Cindermourn** — implemented exactly as GAME_DESIGN.md's
+  own example specified it (+35 Attack, +15% damage vs. `"ashen"`,
+  restores 5 MP on kill), via new structured `EquipmentData` fields
+  rather than the vague `special_effect_id` string.
+- Cleanup: removed the dead `data/gates/combinations/silent_marsh.tres`
+  and `data/maps/silent_marsh.tres` rows — that combination was never
+  built as a real scene through 4 prior phases, and now correctly just
+  generates a Drowned-themed dungeon like any other combination.
+  GAME_DESIGN.md documents this as a deliberate supersession, not a
+  silent drop of established lore.
+- Also fixed in passing: GAME_DESIGN.md's currency was named "Glimmer"
+  but every line of actual code/UI since Phase 2 has said "Gold" —
+  updated the doc to match reality rather than leave two names drifting.
+
+FILES CHANGED: see this milestone's commit (large — ~9 new gameplay
+scripts, 4 new scenes/prefabs, ~20 new data files, 4 new tile SVGs).
+
+INTERFACES CHANGED:
+- `GateCombinationData.result_type` enum dropped the unused `"locked"`
+  value.
+- `EncounterData` gained `level: int` and `loot_table_id_override: String`
+  (additive).
+- `EquipmentData` gained `bonus_damage_vs_family`, `bonus_damage_percent`,
+  `mp_restore_on_kill` (additive).
+- `EnemyData` unchanged this phase (already had `gate_clue_id` from
+  Phase 4).
+- New `SceneManager` methods: `go_to_generated_dungeon()`,
+  `go_to_generated_battle()`, `go_to_current_map()` (the last one is
+  what `BattleUI` now calls instead of `go_to_map(current_map_id)`
+  directly — see KNOWN ISSUES below for why that mattered).
+- New `GameState` fields: `pending_generated_encounter`,
+  `pending_dungeon_profile` (both battle/session-scoped, not saved,
+  same pattern as `pending_encounter_id`).
+
+TESTS:
+- `godot4 --headless --path . --quit-after 10`: Boot -> Town, no
+  runtime errors.
+- Explicitly re-verified Cinderfall Woods and the new RedGate.tscn each
+  boot cleanly as real scene loads (not just through the resolver).
+- Temporary self-test (removed before commit) covered, with real code
+  paths rather than parse-only checks:
+  - `GateResolver.resolve()` for all 4 result types with real word
+    combinations, including the exact Red Gate and Cinderfall Woods
+    rows and a deliberately invalid origin word.
+  - `EnemyScaler` at all 4 levels — factors (1.00/1.35/1.70/2.05) and
+    resulting stats matched the formula exactly.
+  - **A full BFS reachability check (same technique as Phase 1) across
+    all 4 generated-dungeon templates**: every doorway and every
+    encounter tile reachable from spawn, for all 4 branch tiers — not
+    just "does it parse," but "can a player actually get everywhere
+    this dungeon puts something."
+  - All 4 templates also instantiated for real (as child nodes, not a
+    main-scene swap) to confirm `RectMapBuilder`/prop-spawning runs
+    with no runtime errors for each theme/tier combination.
+  - Cindermourn's family bonus, measured against a non-lethal hit so no
+    `_win()`/level-up could confound the number: 70 HP -> 31 HP, exactly
+    `round((40 atk - 6 def) * 1.15) = 39` damage.
+  - `mp_restore_on_kill`, measured against a kill that stays under the
+    XP-to-level-2 threshold so `Leveling`'s own full-heal-on-level-up
+    couldn't mask it: 0 MP -> 5 MP exactly.
+- **Real bugs found by this testing, not just clean passes:**
+  1. `SceneManager.go_to_generated_dungeon()` set
+     `GameState.current_map_id = "generated"`, but `BattleUI` returned
+     from a battle by calling `go_to_map(GameState.current_map_id)` —
+     which would have tried to load a nonexistent `data/maps/generated.tres`
+     and silently stranded the player in the battle scene forever after
+     winning or fleeing a fight in *any* generated dungeon. Caught by
+     tracing the round-trip before ever running it, not by a failing
+     test. Fixed by adding `SceneManager.go_to_current_map()`, which
+     branches on `current_map_id == "generated"` and rebuilds the same
+     dungeon from the still-held `pending_dungeon_profile` instead;
+     `BattleUI` now calls this instead of `go_to_map()` directly.
+  2. The enemy HP bar in `BattleUI` still read the enemy's *base*
+     `max_hp` after `EnemyScaler` was introduced, so a level-4 enemy's
+     HP bar denominator would have been wrong (e.g. showing `42/70`
+     against an effective max of ~94). Fixed to compute
+     `EnemyScaler.max_hp()` for display too.
+  - Two test-harness mistakes, same recognizable patterns as prior
+    phases: an invalid Origin word used in the tier-0 boot check (typo
+    from copy-pasting a Sign word), and the MP-restore measurement
+    initially picked a kill that also leveled up the player, so
+    `Leveling`'s own full-heal masked the actual restored amount —
+    both fixed by adjusting the test, not the production code.
+
+KNOWN ISSUES:
+- Generated dungeons all use the same 4 layout templates — the physical
+  shape repeats across many word combinations sharing a branch tier,
+  even though theme/level/loot still differ. See the Open Interface
+  Decisions Log entry for why, and revisit after a human has actually
+  played a few to judge if it feels repetitive.
+- No enemy variety per Origin theme — every generated dungeon reuses
+  Ember Wisp/Bramble Husk regardless of theme. Also a documented,
+  deliberate scope decision (CLAUDE.md's "3-5 enemy types" budget).
+- The Gate UI's word dropdowns show all pool words with no indication
+  of which combinations are "interesting" — matches the intended
+  discovery/mystery design pillar, but is worth confirming feels right
+  once played, not just read.
+- As with every prior phase: validated headlessly and via targeted
+  logic self-tests (including, this time, a full reachability sweep
+  and exact-number combat math checks), never by clicking through a
+  real window. UI layout (3 dropdowns + Open Gate button), pacing of
+  the "the Gate hums..." flavor-text delay, and general dungeon *feel*
+  across the 4 templates all need an editor playtest pass.
+
+FOLLOW-UP (Phase 6 — Boss + Polish):
+- Boss mechanics/AI variety for the Ashen Warden beyond "always use its
+  one skill" (shared with every other enemy right now).
+- Better map presentation: parallax/lighting/elevation cues per
+  GAME_DESIGN.md Section 7 — every map is still flat placeholder tiles.
+- Sound (currently nothing — `scripts/audio/`/`audio/` are still empty).
+- Combat feedback polish (screen shake, hit flash, etc.).
+- Basic balancing pass — actually play through several generated
+  dungeons at different levels and see if the difficulty curve feels
+  right, per GAME_DESIGN.md Section 27 (measure, then adjust).
+- STOP AND TEST — this was the last CLAUDE.md-defined phase before
+  "expand the game" territory (Section 23). Worth a deliberate check-in
+  with the project owner on what comes after Phase 6.
+
+---
+
 ## 2026-09-15 — Phase 4: Loot established
 
 STATUS: COMPLETE

@@ -119,23 +119,51 @@ A Gate combination is three keywords, one from each category:
 - Gale
 - Umbra
 
-### Prototype combinations
+### How a combination resolves (Phase 5 — implemented)
+
+Every well-formed combination does *something* — the words themselves
+determine what, rather than most combinations being an "Unknown"
+no-op. This is a deliberate design change from the original "catalogued
+rows only" plan (see AGENT_CONTRACTS.md's decision log), made to match
+the *.hack*-inspired feel the CLAUDE.md brief asked for: any three
+words open onto somewhere, and which words you choose determines what
+kind of somewhere.
 
 | Combination | Result |
 |---|---|
-| `Cinder + Broken + Ember` | Normal map: **Cinderfall Woods** |
-| `Drowned + Silent + Tide` | Normal map: **The Silent Marsh** |
-| `Hollow + Undying + Ember` | **SPECIAL** — opens the Red Gate |
-| any other known ORIGIN/TONE/SIGN triple not listed | "Unknown combination" (data-driven placeholder, safe no-op) |
-| a keyword not in the pool, or malformed input | "Invalid combination" (rejected safely, no crash) |
-| a catalogued triple the player hasn't unlocked yet | "Locked combination" |
+| `Hollow + Undying + Ember` | **SPECIAL** — opens the Red Gate (see below) |
+| `Cinder + Broken + Ember` | Normal map: **Cinderfall Woods** (the one hand-crafted normal dungeon) |
+| any other well-formed `ORIGIN + TONE + SIGN` triple | **GENERATED** — a dungeon built from that combination's own words (see "Word-driven generation" below) |
+| a keyword not in the pool, or an incomplete selection | "Invalid combination" (rejected safely, no crash) |
 
 The Red Gate combination is never shown directly to the player. It must
 be pieced together from Gate discovery sources (Section 8).
 
-Gate resolution logic lives entirely in `/scripts/gates/` and reads its
-combination table from `/data/gates/`. No combination is hardcoded into
-UI, combat, or world scripts.
+Gate resolution logic lives entirely in `/scripts/gates/` (`GateResolver`)
+and reads its known/special rows from `/data/gates/combinations/`. No
+combination is hardcoded into UI, combat, or world scripts.
+
+### Word-driven generation
+
+Each word category maps onto a different axis of the generated
+dungeon, so the words genuinely change what you get, not just where you
+end up:
+
+| Word category | Controls | Prototype values |
+|---|---|---|
+| **ORIGIN** | Visual theme (floor tile palette) | Cinder=ash, Verdant=lush green, Drowned=teal/wet, Hollow=dark void |
+| **TONE** | Enemy level (1-4), which scales enemy stats and which loot tier drops | Silent=1, Broken=2, Forgotten=3, Undying=4 |
+| **SIGN** | Dungeon shape/size (0-3 side branches) | Ember=0 (small, single room), Gale=1, Tide=2, Umbra=3 (large, most branching) |
+
+A generated dungeon reuses the same two Cinderfall Woods enemies (Ember
+Wisp, Bramble Husk) at the computed level, rather than needing unique
+monster art/stats per Origin theme — see Section 24 on scope discipline.
+The *shape* of a dungeon (which physical layout template a given branch
+tier uses) is currently one of 4 fixed templates, not a unique random
+layout per word triple; see ARCHITECTURE.md Section 7a for the reasoning
+(this sandbox has no display to catch a broken randomly-generated
+layout, so the layout itself stays deterministic and pre-verified while
+level/theme/loot still vary with the words).
 
 ## 7. Maps
 
@@ -145,23 +173,36 @@ UI, combat, or world scripts.
 - Gate interface (enter keyword combinations)
 - Save point
 
-### Normal Map 1 — Cinderfall Woods
+### Cinderfall Woods — the one hand-crafted normal dungeon
 - Reached via `Cinder + Broken + Ember`
 - Early-game enemies, first equipment tier
 - One branching exploration path (a side area with bonus loot)
+- Kept hand-crafted (not generated) specifically so the game's very
+  first dungeon has a designed, tested shape rather than a formulaic
+  template — see Section 25's discovery→reward→power loop.
 
-### Normal Map 2 — The Silent Marsh
-- Reached via `Drowned + Silent + Tide`
-- Slightly harder enemies, second equipment tier
-- Contains an environmental Gate clue (Section 8)
+### Every other normal destination — generated, not curated
+
+**The Silent Marsh, as a distinct hand-authored map, is superseded by
+Phase 5's word-driven generation system** (see Section 6). Its planned
+combination, `Drowned + Silent + Tide`, was never built as a real scene
+(only stubbed data through Phase 4) — it now simply generates a
+Drowned-themed, level-1, single-branch dungeon like any other
+`Drowned + Silent + *` combination, rather than pointing at a dedicated
+map. This is a deliberate design supersession, not an oversight: with
+every valid combination now producing *something*, a second hand-built
+"normal map" alongside Cinderfall Woods stopped pulling its weight.
 
 ### Special Map — The Red Gate
 - Reached via `Hollow + Undying + Ember`
 - Distinct palette (deep red/black), distinct ambience
-- Unique enemy + boss: **the Ashen Warden**
-- Contains the unique weapon: **Cindermourn**
-- Not a recolor of the normal maps — different tileset, different
-  encounter table, different music cue hook
+- Boss: **the Ashen Warden** (family `"ashen"`, guaranteed fight, can't
+  be fled from)
+- Contains the unique weapon: **Cindermourn** — +35 Attack, +15%
+  damage vs. the `"ashen"` family, restores 5 MP on kill (implemented
+  exactly as originally specified in Section 11's example)
+- Not a recolor of the normal maps — its own tileset color, its own
+  hand-placed layout, not the generation system used elsewhere
 
 ## 8. Gate Discovery
 
@@ -190,12 +231,18 @@ resolve -> show result -> repeat until victory/defeat.
 Commands: **Attack, Skill, Item, Defend, Run**.
 
 ### Enemies (prototype set)
-- Ember Wisp (Cinderfall Woods, common)
-- Bramble Husk (Cinderfall Woods, common)
-- Tideling (Silent Marsh, common)
-- Hollow Stalker (Silent Marsh, common)
-- Cinder Wraith (Cinderfall Woods, mini-boss, drops a Gate clue)
+- Ember Wisp (common — Cinderfall Woods, and reused at scaled level/stats
+  in every generated dungeon; see Section 6's word-driven generation)
+- Bramble Husk (common — same reuse as Ember Wisp)
+- Cinder Wraith (Cinderfall Woods mini-boss, drops a Gate clue)
 - **Ashen Warden** (Red Gate boss)
+
+Tideling and Hollow Stalker were originally planned as Silent Marsh's
+enemies; since Silent Marsh as a distinct hand-authored map is
+superseded by Phase 5's generation system (see Section 7), they're not
+built and not currently planned — generated dungeons reuse the two
+common enemies above rather than needing unique monster content per
+Origin theme (CLAUDE.md's "3-5 enemy types" scope guidance).
 
 ### Player abilities (prototype set, 3–5)
 - Basic Attack (free, weapon-scaled)
@@ -210,7 +257,9 @@ Commands: **Attack, Skill, Item, Defend, Run**.
 - Stats: **HP, MP, Attack, Defense, Magic Power, Speed** (deliberately
   small — do not add stats without a demonstrated need)
 - Equipment slots: **Weapon, Armor, Accessory**
-- Currency: **Glimmer** (single currency, no premium currency)
+- Currency: **Gold** (single currency, no premium currency — renamed
+  from this doc's original "Glimmer" once implementation settled on
+  the plainer name; noted here so the two don't drift apart again)
 
 ## 11. Gear & Rarity
 
@@ -219,19 +268,22 @@ Rarity tiers: **Common, Uncommon, Rare, Unique**.
 Every item has: name, description, rarity, level requirement (optional),
 stat block, optional special effect, value, source.
 
-### Example progression (illustrative, not final balance)
+### Progression, as actually implemented (Phases 3-5)
 
-| Item | Rarity | Stats | Notes |
+| Item | Rarity | Stats | Source |
 |---|---|---|---|
 | Rusted Shortsword | Common | +6 Attack | Waymark shop |
-| Cinderfall Cleaver | Uncommon | +14 Attack | Cinderfall Woods drop |
-| Marshfang Blade | Rare | +28 Attack | Silent Marsh drop |
-| Warden's Edge | Rare | +42 Attack | Normal top-end weapon |
-| **Cindermourn** | **Unique** | +35 Attack, +15% damage vs. the Ashen family, restores 5 MP on kill | Red Gate reward — identity over raw numbers |
+| Traveler's Vest | Common | +3 Defense, +5 max HP | Waymark shop |
+| Lucky Charm | Common | +2 Speed | Waymark shop |
+| Cinderfall Cleaver | Uncommon | +14 Attack | Cinderfall Woods / generated-dungeon drop |
+| Ashcinder Guard | Rare | +10 Defense, +10 max HP | Cinder Wraith drop, or a level-4 generated dungeon |
+| **Cindermourn** | **Unique** | +35 Attack, +15% damage vs. the `"ashen"` family, restores 5 MP on kill | Ashen Warden (Red Gate) drop — the only guaranteed unique |
 
-Cindermourn is deliberately *not* just a bigger number than Warden's
-Edge. It trades raw Attack for a build-defining effect, per the design
-pillar in Section 4 of CLAUDE.md.
+Cindermourn is deliberately *not* just a bigger number than the Rare
+tier above it. It trades some of the raw Attack a min-maxed build might
+want for a build-defining effect, per the design pillar in Section 4 of
+CLAUDE.md — and unlike the earlier illustrative draft of this table,
+every row here is real, implemented content, not a placeholder example.
 
 ## 12. Design Pillars (from CLAUDE.md, restated for quick reference)
 

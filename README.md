@@ -8,7 +8,7 @@ Not an MMO. No accounts, no live service, no persistent online world.
 
 ## Status
 
-Phase 4 (Loot) complete. See `docs/PROGRESS.md`.
+Phase 5 (Gates) complete. See `docs/PROGRESS.md`.
 
 ## Controls
 
@@ -34,26 +34,28 @@ godot4 --headless --path . --quit-after 5    # headless smoke run
 ```
 
 The current build boots to Waymark (town): walk around with WASD/arrow
-keys, and walk into the doorway on the east wall to reach Cinderfall
-Woods (the prototype's first dungeon, with a branching side path). Walk
-into its west doorway to return to Waymark. Three orange/red markers in
-Cinderfall Woods start a battle: two common enemies in the main
-corridor, and the Cinder Wraith mini-boss (who won't let you flee) in
-the branch alcove to the north.
+keys. The purple marker opens **the Gates** — pick one word each for
+Origin, Tone, and Sign, and Open Gate. Almost every combination leads
+somewhere:
+
+- `Cinder + Broken + Ember` — Cinderfall Woods, the one hand-crafted
+  dungeon (branching path, two common enemies, the Cinder Wraith
+  mini-boss who won't let you flee and drops a Gate clue).
+- `Hollow + Undying + Ember` — the Red Gate, a fixed, distinctly
+  red/black destination guarding the Ashen Warden (also unfleeable)
+  and its guaranteed drop, the unique weapon **Cindermourn**.
+- Any other well-formed combination generates a dungeon on the spot:
+  the **Origin** word picks its visual theme, the **Tone** word picks
+  its enemy level (1-4, scaling difficulty and rewards), and the
+  **Sign** word picks how large/branching it is (0-3 side paths).
 
 The gold marker in Waymark opens the shop — spend battle gold on a
 weapon, armor, an accessory, or a healing draught. Press `I` anywhere
 to open your Inventory and equip what you've bought; equipped gear
 changes your stats immediately, including in the very next fight, and
-each equippable item now shows how it compares to whatever you have
-equipped in that slot.
-
-Cinderfall Woods' enemies can now also drop gear directly: the two
-common enemies sometimes drop an Ember Draught or the uncommon
-Cinderfall Cleaver, and the Cinder Wraith always drops the rare
-Ashcinder Guard — and, quietly, a clue toward the Red Gate. There is no
-Gate UI to use that clue yet — see `docs/PROGRESS.md` for what's next
-(Phase 5: Gates).
+each item shows how it compares to whatever you currently have
+equipped. Enemies can also drop gear directly, with better odds at
+tougher dungeons' loot tiers.
 
 All tile art is deliberately placeholder (solid-color squares) — see
 `docs/GAME_DESIGN.md` Section 7 on art direction.

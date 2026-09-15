@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/world/town.gd" id="1"]
 [ext_resource type="TileSet" path="res://art/tiles/world_tileset.tres" id="2"]
-[ext_resource type="Script" path="res://scripts/world/map_transition_area.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/world/gate_trigger.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/world/shop_trigger.gd" id="4"]
 
 [sub_resource type="RectangleShape2D" id="RectShape_door"]
@@ -22,15 +22,21 @@ tile_set = ExtResource("2")
 [node name="PlayerSpawn" type="Marker2D" parent="."]
 position = Vector2(112, 176)
 
-[node name="ToCinderfallWoods" type="Area2D" parent="."]
+[node name="GateCluster" type="Area2D" parent="."]
 position = Vector2(560, 176)
 collision_layer = 0
 collision_mask = 2
 script = ExtResource("3")
-target_map_id = "cinderfall_woods"
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="ToCinderfallWoods"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="GateCluster"]
 shape = SubResource("RectShape_door")
+
+[node name="Marker" type="ColorRect" parent="GateCluster"]
+offset_left = -14.0
+offset_top = -14.0
+offset_right = 14.0
+offset_bottom = 14.0
+color = Color(0.55, 0.15, 0.65, 1)
 
 [node name="TitleLabel" type="Label" parent="."]
 offset_left = 8.0
@@ -40,12 +46,12 @@ offset_bottom = 30.0
 text = "Waymark"
 label_settings = SubResource("LabelSettings_title")
 
-[node name="DoorLabel" type="Label" parent="."]
+[node name="GateLabel" type="Label" parent="."]
 offset_left = 470.0
 offset_top = 140.0
 offset_right = 630.0
 offset_bottom = 172.0
-text = "Cinderfall Woods ->"
+text = "The Gates"
 
 [node name="ShopTrigger" type="Area2D" parent="."]
 position = Vector2(464, 80)

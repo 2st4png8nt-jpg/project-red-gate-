@@ -9,9 +9,14 @@ var unlocked_maps: Array[String] = ["waymark"]
 var known_gate_clues: Array[String] = []
 
 # Set by SceneManager.go_to_battle() just before switching to Battle.tscn;
-# read once by BattleManager._ready(). Not part of the save data — a
-# battle never persists across a save/load.
+# read once by BattleManager._enter_tree(). Not part of the save data —
+# a battle never persists across a save/load.
 var pending_encounter_id: String = ""
+
+# Phase 5 (Gates) additions, same "battle-scoped, never saved" pattern
+# as pending_encounter_id above.
+var pending_generated_encounter: EncounterData = null # set by SceneManager.go_to_generated_battle()
+var pending_dungeon_profile: DungeonProfile = null # set by SceneManager.go_to_generated_dungeon()
 
 func discover_clue(clue_id: String) -> void:
 	if not known_gate_clues.has(clue_id):

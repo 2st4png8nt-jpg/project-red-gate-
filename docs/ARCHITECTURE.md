@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Project Red Gate
 
 Owner: Lead / Architect
-Status: Phase 4 (Loot)
+Status: Phase 5 (Gates)
 
 This document is the technical source of truth. It describes how the
 systems fit together and where the boundaries between agent-owned areas
@@ -44,8 +44,8 @@ scripts/
   data/               Agent 1 / Agent 3: Resource *schema* definitions (class_name only, no content)
   rpg/                Agent 3 (RPG/Gear): player stats, inventory, equipment, leveling, currency
   combat/             Agent 2 (Combat): battle state machine, commands, damage resolution
-  world/              Agent 4 (World/Gate): player movement, map transitions, map controllers
-  gates/              Agent 4 (World/Gate): Gate combination resolution
+  world/              Agent 4 (World/Gate): player movement, map transitions, map controllers, GeneratedDungeon
+  gates/              Agent 4 (World/Gate): GateResolver, DungeonProfile
   ui/                 Agent 5 (UI/UX): all Control-based UI scripts
   enemies/            Agent 6 (Enemy/Content): enemy behavior scripts, LootRoller
   audio/              Agent 8 (Audio): audio manager, playback hooks
@@ -60,11 +60,11 @@ data/                 Content, as .tres Resource files (data-driven, no logic)
   items/              Agent 3
   characters/         Agent 3 (base player stat block)
   maps/               Agent 4 (map metadata: id, display name, exits, encounter table id)
-  gates/              Agent 4 (keyword pool + combination table)
+  gates/              Agent 4 (keyword pool + known/special combination rows + clues/)
   skills/             Agent 2 (player + enemy SkillData rows)
   enemies/            Agent 6
   encounters/         Agent 6 (single-enemy EncounterData rows)
-  loot/               Agent 6 (LootTableData rows, referenced by EnemyData.loot_table_id)
+  loot/               Agent 6 (LootTableData rows, referenced by EnemyData.loot_table_id or an EncounterData.loot_table_id_override)
 
 art/                  Agent 7: sprites, tiles, UI art (placeholders acceptable)
 assets/               Agent 7: misc non-code assets
@@ -203,7 +203,10 @@ not owns:
   the instant it's equipped, not just after the next battle starts.
 
 One `BattleManager` instance lives at the root of `scenes/combat/Battle.tscn`
-(not an autoload — a fresh instance per battle). It reads
+(not an autoload — a fresh instance per battle). It reads either
+`GameState.pending_generated_encounter` (Phase 5 — an in-memory
+`EncounterData` built by a `GeneratedEncounterTrigger`, checked first
+and cleared once consumed) or falls back to the file-based
 `GameState.pending_encounter_id` (set by `SceneManager.go_to_battle()`)
 in **`_enter_tree()`, not `_ready()`**: Godot runs a node's `_ready()`
 after all of its children's `_ready()` calls, so if `BattleManager`
@@ -211,7 +214,10 @@ initialized `enemy`/`player` in its own `_ready()`, its child `BattleUI`
 would read them as still-null during `BattleUI._ready()`. `_enter_tree()`
 runs top-down (parent before children), so state is guaranteed set
 before any child reads it. (Caught by the Phase 2 headless self-test —
-see PROGRESS.md.)
+see PROGRESS.md.) Both paths converge on the same private
+`_start_with_encounter(encounter: EncounterData)`, which also stores
+`current_encounter` (used by `_win()`'s loot lookup — see Section 6b)
+and `enemy_level` (used by `EnemyScaler` — see below).
 
 Exposed API (UI calls these, never touches damage math directly):
 - `start_battle(encounter_id: String)`
@@ -230,16 +236,36 @@ Exposed signals (UI reads state only through these plus the public
 
 Damage formulas (deliberately simple — see GAME_DESIGN.md Section 27,
 balance from playtesting, not a spreadsheet up front; `attacker.attack`
-etc. below mean the `StatsCalculator` effective value, not the raw
-`PlayerData` field, for the player's side):
-- Basic attack: `max(1, attacker.attack - defender.defense)`
-- Skill (non-self): `max(1, skill.power + attacker.magic_power - defender.defense)`
+etc. below mean the `StatsCalculator` effective value for the player's
+side, and the `EnemyScaler` scaled value — see Section 7a — for the
+enemy's side; `enemy_level` defaults to 1, so hand-authored Phase 2-4
+encounters are completely unaffected by this Phase 5 addition):
+- Basic attack: `max(1, attacker.attack - defender.defense)`, then the
+  weapon family bonus below if it applies
+- Skill (non-self): `max(1, skill.power + attacker.magic_power - defender.defense)`,
+  then the weapon family bonus below if it applies
 - Skill (`target_type == "self"`): heals `skill.power` HP, no defense involved
 - Defending halves the next hit taken (integer division), one-shot flag
   cleared after it's used once
 - Enemies always use `skill_ids[0]` if they have one, else basic attack
   — no enemy AI variety yet (Phase 2 scope); enemies have no equipment,
-  so `EnemyData`'s raw fields are used as-is
+  so `EnemyData`'s fields (scaled by `EnemyScaler` for level) are used
+  as-is
+- **Weapon family bonus (Phase 5 — Cindermourn's identity):** if
+  `player.equipped_weapon.bonus_damage_vs_family` is non-empty and
+  equals `enemy.family`, the computed damage is multiplied by
+  `1.0 + bonus_damage_percent` (rounded, floor of 1). Applied in
+  `_apply_weapon_family_bonus()`, called from both `player_attack()`
+  and `player_use_skill()`'s non-self branch so it can't be
+  accidentally skipped by one command and not the other.
+- **MP restore on kill (Phase 5):** in `_win()`, if
+  `player.equipped_weapon.mp_restore_on_kill > 0`, MP is restored by
+  that amount (capped at `StatsCalculator.effective_max_mp`) *after*
+  `Leveling.grant_xp()` has already run — a kill that also levels up
+  gets its free full-MP heal from leveling first, so the restore may
+  visibly do nothing on top of that; this is correct composition, not
+  a bug (a self-test initially measured this wrong by picking a kill
+  that also leveled up — see PROGRESS.md).
 - Item command (Phase 3): uses `Inventory.find_first_consumable()` —
   the first `ConsumableData` in `player.inventory` — and heals its
   `heal_hp`/`heal_mp`, capped at the effective max. No item-selection
@@ -321,12 +347,14 @@ among `item_ids`. Content lives in `data/loot/`, referenced by
 `EnemyData.loot_table_id`.
 
 `BattleManager._win()` (Phase 4 addition) rolls the defeated enemy's
-loot table (if `loot_table_id` is set), adds any resulting item via
-`Inventory.add_item`, and — new `EnemyData.gate_clue_id` field — calls
-`GameState.discover_clue()` if set. Both feed into the richer
-`action_resolved` victory message and the extended `battle_won` signal
-above, so `BattleUI` never has to ask `BattleManager` "what happened"
-after the fact.
+loot table — `current_encounter.loot_table_id_override` if set (Phase
+5, used by generated dungeons whose loot tier depends on the dungeon's
+level, not the enemy's own fixed `loot_table_id`), else
+`enemy.loot_table_id` — adds any resulting item via `Inventory.add_item`,
+and — `EnemyData.gate_clue_id` field — calls `GameState.discover_clue()`
+if set. Both feed into the richer `action_resolved` victory message and
+the extended `battle_won` signal above, so `BattleUI` never has to ask
+`BattleManager` "what happened" after the fact.
 
 `InventoryUI`'s equipment comparison (Section 6a) reads
 `EquipmentData`'s `@export` bonus fields directly via `Resource.get(field_name)`
@@ -335,17 +363,85 @@ rather than a per-stat match statement — see `_format_comparison()` in
 logic; it only diffs one candidate item against whatever already
 occupies that slot.
 
-## 7. Gate Resolution Contract
+## 7. Gate Resolution Contract (Phase 5 — implemented)
 
-`scripts/gates/gate_resolver.gd` exposes:
-- `resolve(origin: String, tone: String, sign: String) -> GateResult`
+`GateResolver.resolve(origin: String, tone: String, sign: String) -> Dictionary`
+never throws; every input maps to exactly one of these, checked in this
+priority order:
 
-Where `GateResult` (a small typed return, see AGENT_CONTRACTS.md) is one
-of: `KNOWN` (has a destination map id), `SPECIAL` (unlocks the Red Gate),
-`LOCKED` (known but not yet unlocked), `UNKNOWN` (well-formed but not in
-the table), `INVALID` (malformed input — e.g. empty string or a keyword
-outside the current pool). The resolver never throws; every input path
-returns a `GateResult`.
+1. **`SPECIAL`** — the exact triple matches a `data/gates/combinations/*.tres`
+   row with `result_type = "special"` (currently just the Red Gate).
+   Returns `{"type": SPECIAL, "destination_map_id": String}`.
+2. **`KNOWN`** — matches a row with `result_type = "known"` (currently
+   just Cinderfall Woods). Same return shape as `SPECIAL`.
+3. **`GENERATED`** — every other combination where all three words are
+   real pool members (one from each category). Returns
+   `{"type": GENERATED, "dungeon_profile": DungeonProfile}`.
+4. **`INVALID`** — any word missing from the pool, or the wrong
+   category. Returns `{"type": INVALID}`.
+
+This is a deliberate change from the original "mostly Unknown until
+catalogued" design (see AGENT_CONTRACTS.md's Open Interface Decisions
+Log): there is no `UNKNOWN`/`LOCKED` result anymore. Every well-formed
+combination produces a real destination — the mystery is in not knowing
+which words to pick, not in the game refusing a combination it doesn't
+recognize.
+
+## 7a. Word-Driven Dungeon Generation (Phase 5)
+
+**`DungeonProfile`** (`scripts/gates/dungeon_profile.gd`) is the pure
+data output of `GateResolver`'s `GENERATED` case — computed by
+`DungeonProfile.compute(origin, tone, sign)`, never authored as
+content:
+
+| Field | Driven by | Range / meaning |
+|---|---|---|
+| `level` | Tone | 1-4 (`1 + TONE_LEVEL_OFFSET[tone]`) — scales enemy stats and picks a loot tier |
+| `floor_source_id` | Origin | which `world_tileset.tres` source is this dungeon's floor (visual theme) |
+| `branch_tier` | Sign | 0-3 — how many side branches/how large the generated layout is |
+| `loot_table_id` | derived from `level` | `generated_low_loot` (≤2) / `generated_mid_loot` (3) / `generated_high_loot` (4) |
+
+**Why the layout itself is templated, not randomly generated per
+combination:** this sandbox has no display, so a genuinely unique
+random maze per word triple could produce an unreachable branch or a
+sealed player spawn that only a human playing it would catch. Instead,
+`GeneratedDungeon.tscn`/`generated_dungeon.gd` (Agent 4) picks one of 4
+fixed layout *templates* by `branch_tier` (a doorway + straight
+corridor, plus 0-3 side branches each guaranteed to touch or overlap
+the corridor by construction — same additive-open-rect technique as
+`RectMapBuilder`, just computed per-tier instead of hand-authored per
+map) and paints it with `profile.floor_source_id`. The words still
+determine map type, level, dungeon size, and loot table exactly as
+asked; only the exact tile-by-tile geometry is one of 4 templates
+rather than unique per combination. All 4 templates' reachability
+(every doorway and encounter spot reachable from spawn) was verified
+with the same BFS self-test technique used for Cinderfall Woods in
+Phase 1 — see PROGRESS.md.
+
+**How a generated encounter differs from a hand-authored one:**
+`GeneratedEncounterTrigger` (`scripts/world/generated_encounter_trigger.gd`)
+builds an `EncounterData` *in memory* at trigger time (picking randomly
+from `enemy_ids`, an Ember Wisp/Bramble Husk pool) instead of loading
+one from `data/encounters/*.tres` — there's no practical way to
+pre-author a row per possible word combination. It sets the new
+`EncounterData.level` and `loot_table_id_override` fields from the
+dungeon's profile, then calls `SceneManager.go_to_generated_battle()`.
+`BattleManager._enter_tree()` checks `GameState.pending_generated_encounter`
+before falling back to the file-based `pending_encounter_id` path, so
+both flows share the exact same combat code from that point on — see
+Section 6's `EnemyScaler` note.
+
+`SceneManager.go_to_generated_dungeon(profile)` sets
+`GameState.current_map_id = "generated"` and
+`GameState.pending_dungeon_profile = profile` (deliberately **not**
+cleared after `GeneratedDungeon.tscn` reads it, unlike the
+one-shot-consumed `pending_encounter_id`/`pending_generated_encounter`)
+so that `SceneManager.go_to_current_map()` — what `BattleUI` calls to
+return from a battle — can rebuild the identical dungeon by checking
+for `current_map_id == "generated"` and re-calling
+`go_to_generated_dungeon()` with the same profile, rather than trying
+(and failing) to look up a `data/maps/generated.tres` row that doesn't
+exist.
 
 ## 8. Save Data Shape (Phase 0 minimum)
 

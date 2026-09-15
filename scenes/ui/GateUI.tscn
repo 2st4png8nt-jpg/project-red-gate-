@@ -1,0 +1,69 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/gate_ui.gd" id="1"]
+
+[node name="GateUI" type="CanvasLayer"]
+visible = false
+script = ExtResource("1")
+
+[node name="Root" type="Control" parent="."]
+offset_right = 640.0
+offset_bottom = 360.0
+
+[node name="Background" type="ColorRect" parent="Root"]
+offset_right = 640.0
+offset_bottom = 360.0
+color = Color(0.08, 0.05, 0.13, 0.92)
+
+[node name="TitleLabel" type="Label" parent="Root"]
+offset_left = 16.0
+offset_top = 8.0
+offset_right = 300.0
+offset_bottom = 32.0
+text = "Waymark Gates"
+
+[node name="OriginOption" type="OptionButton" parent="Root"]
+offset_left = 16.0
+offset_top = 40.0
+offset_right = 200.0
+offset_bottom = 64.0
+
+[node name="ToneOption" type="OptionButton" parent="Root"]
+offset_left = 16.0
+offset_top = 68.0
+offset_right = 200.0
+offset_bottom = 92.0
+
+[node name="SignOption" type="OptionButton" parent="Root"]
+offset_left = 16.0
+offset_top = 96.0
+offset_right = 200.0
+offset_bottom = 120.0
+
+[node name="OpenButton" type="Button" parent="Root"]
+offset_left = 16.0
+offset_top = 124.0
+offset_right = 140.0
+offset_bottom = 150.0
+text = "Open Gate"
+
+[node name="MessageLabel" type="Label" parent="Root"]
+offset_left = 16.0
+offset_top = 156.0
+offset_right = 624.0
+offset_bottom = 196.0
+autowrap_mode = 2
+
+[node name="CluesLabel" type="Label" parent="Root"]
+offset_left = 16.0
+offset_top = 200.0
+offset_right = 624.0
+offset_bottom = 320.0
+autowrap_mode = 2
+
+[node name="CloseButton" type="Button" parent="Root"]
+offset_left = 16.0
+offset_top = 326.0
+offset_right = 120.0
+offset_bottom = 352.0
+text = "Close"
