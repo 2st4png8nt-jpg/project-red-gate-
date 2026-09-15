@@ -1,0 +1,26 @@
+[gd_resource type="TileSet" load_steps=5 format=3]
+
+[ext_resource type="Texture2D" path="res://art/tiles/tile_grass.svg" id="1"]
+[ext_resource type="Texture2D" path="res://art/tiles/tile_dirt.svg" id="2"]
+[ext_resource type="Texture2D" path="res://art/tiles/tile_forest_floor.svg" id="3"]
+
+[sub_resource type="TileSetAtlasSource" id="AtlasSource_grass"]
+texture = ExtResource("1")
+texture_region_size = Vector2i(32, 32)
+0:0/0 = 0
+
+[sub_resource type="TileSetAtlasSource" id="AtlasSource_dirt"]
+texture = ExtResource("2")
+texture_region_size = Vector2i(32, 32)
+0:0/0 = 0
+
+[sub_resource type="TileSetAtlasSource" id="AtlasSource_forest"]
+texture = ExtResource("3")
+texture_region_size = Vector2i(32, 32)
+0:0/0 = 0
+
+[resource]
+tile_size = Vector2i(32, 32)
+sources/0 = SubResource("AtlasSource_grass")
+sources/1 = SubResource("AtlasSource_dirt")
+sources/2 = SubResource("AtlasSource_forest")

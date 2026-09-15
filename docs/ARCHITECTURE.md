@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Project Red Gate
 
 Owner: Lead / Architect
-Status: Phase 0 (Foundation)
+Status: Phase 1 (Movement + World)
 
 This document is the technical source of truth. It describes how the
 systems fit together and where the boundaries between agent-owned areas
@@ -119,19 +119,73 @@ exact fields of each):
 - `scripts/data/gate_combination_data.gd` — `GateCombinationData`
 - `scripts/data/map_data.gd` — `MapData`
 
-## 5. Scene / State Flow (Phase 0 minimum)
+## 5. Scene / State Flow
 
 ```
 Boot.tscn (autoloads already initialized by the engine)
    -> SceneManager.go_to_town()
-Town.tscn
-   -> (Phase 5) Gate interface -> SceneManager.go_to_map(map_id)
-   -> (Phase 1+) Map.tscn -> encounter trigger -> SceneManager.go_to_battle(encounter_id)
+Town.tscn (Waymark)
+   <-> MapTransitionArea doorway -> SceneManager.go_to_map(map_id) -> CinderfallWoods.tscn
+   -> (Phase 5) Gate interface replaces/supplements the raw doorway above
+   -> (Phase 2) encounter trigger -> SceneManager.go_to_battle(encounter_id)
    -> Battle.tscn -> victory/defeat -> SceneManager.return_from_battle()
 ```
 
-Phase 0 only needs Boot -> Town to work end to end with no runtime
-errors. Map/Battle scenes arrive in Phase 1/2.
+Phase 0 needed Boot -> Town to work end to end with no runtime errors.
+Phase 1 (current) adds real movement/camera/tilemap/collision and a
+working Town <-> Cinderfall Woods map transition. Battle scenes arrive
+in Phase 2.
+
+## 5a. World / Movement Layer (Phase 1)
+
+`scripts/world/` (Agent 4) now contains, in addition to map controller
+scripts (`town.gd`, `cinderfall_woods.gd`):
+
+- **`player.gd`** (`scenes/world/Player.tscn`) — a `CharacterBody2D`
+  with 4-directional movement (raw `Input.is_key_pressed` checks; a
+  formal, rebindable `InputMap` is deferred to a later polish phase), a
+  `CollisionShape2D`, and a child `Camera2D` exposing
+  `set_camera_limits(pixel_rect: Rect2i)`. Every map instantiates its
+  own `Player` at a `Marker2D` spawn point and calls
+  `set_camera_limits()` with its own pixel bounds — the Player scene
+  itself carries no per-map data.
+- **`rect_map_builder.gd`** (`RectMapBuilder`, static utility) — paints
+  a `TileMapLayer`'s ground and spawns `Obstacle` colliders from a map
+  size plus a list of open-area `Rect2i`s (tile coordinates); anything
+  not covered by an open rect becomes solid ground with an obstacle on
+  top. Chosen over hand-authoring ASCII art or raw `TileMapLayer`
+  binary `tile_map_data` because a list of rectangles is trivial to
+  read, edit, and unit-test (`RectMapBuilder.is_open_at()` backs a
+  simple BFS reachability check — see PROGRESS.md Phase 1 entry) with
+  no risk of a silently-malformed binary blob.
+- **`map_transition_area.gd`** — a generic `Area2D` doorway: walking a
+  body in the `"player"` group into it calls
+  `SceneManager.go_to_map(target_map_id)`. This is a **Phase 1 stand-in**
+  for the real Gate-driven entry point; Phase 5 will make normal-map
+  entry go through Gate combination resolution instead of a walk-up
+  door (the doorway mechanism itself, and `SceneManager.go_to_map`,
+  stay — only what triggers them changes).
+
+### Collision layers (bits, not layer numbers)
+
+| Layer | Used by |
+|---|---|
+| 1 | World geometry — `Obstacle` (`StaticBody2D`) |
+| 2 | Player (`CharacterBody2D`) |
+| 3 | Reserved for enemies (Phase 2) |
+
+`Player.collision_mask = 1` (collides with world geometry).
+`Obstacle.collision_mask = 0` (static, detects nothing).
+`MapTransitionArea.collision_mask = 2` (detects the player only).
+
+### Map layout contract
+
+A map controller script (e.g. `town.gd`) defines `MAP_SIZE: Vector2i`
+and `OPEN_RECTS: Array[Rect2i]`, calls
+`RectMapBuilder.build(ground_layer, obstacle_container, obstacle_scene, MAP_SIZE, OPEN_RECTS, floor_source_id, wall_ground_source_id)`
+in `_ready()`, then instantiates `Player` at its `PlayerSpawn` marker
+and calls `set_camera_limits()`. Any new map (normal or special) should
+follow this same shape.
 
 ## 6. Combat Interface Contract (established now so Agent 2 and Agent 3
 can work in parallel later — see CLAUDE.md Section 31)

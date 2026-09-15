@@ -1,8 +1,29 @@
-# QA Checklist — Phase 0 (Foundation)
+# QA Checklist — Project Red Gate
 
 Owner: Agent 9 (QA)
 
-## Exit criteria for Phase 0
+## Exit criteria for Phase 1 (Movement + World) — manual, needs a display
+
+These require actually opening the project in the Godot 4.3 editor and
+playing — headless runs cannot verify feel, camera framing, or whether
+movement gets stuck on geometry. Not yet run against this build.
+
+- [ ] Player moves smoothly in all 4 directions with WASD and arrow keys.
+- [ ] Player cannot walk through any obstacle/wall tile in Town or
+      Cinderfall Woods.
+- [ ] Player does not get stuck/snagged on doorway corners or on the
+      seam between adjacent obstacle tiles.
+- [ ] Camera follows the player smoothly and never shows area outside
+      the map bounds.
+- [ ] Walking into the Town doorway transitions to Cinderfall Woods;
+      walking into the Cinderfall Woods doorway transitions back to
+      Town, each time placing the player at the correct spawn point.
+- [ ] The Cinderfall Woods branch alcove is visibly reachable and reads
+      as a distinct side path, not part of the main corridor.
+- [ ] No visible tile seams, gaps, or z-fighting in the placeholder
+      tilemap.
+
+## Exit criteria for Phase 0 (Foundation)
 
 - [ ] Project opens in Godot 4.3 editor with no import errors.
 - [ ] `godot4 --headless --check-only` reports no script parse errors.

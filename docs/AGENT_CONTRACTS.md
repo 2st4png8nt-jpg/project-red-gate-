@@ -91,14 +91,35 @@ Delivered in Phase 0:
 - `data/gates/keywords.tres`-style content seeded with the Section 6
   keyword pool from GAME_DESIGN.md (content only, resolver logic is
   Phase 5).
-- Town scene placeholder (`scenes/world/Town.tscn`) + a minimal
-  `Player.gd` stub sufficient for the Phase 0 bootable prototype only
-  (a static scene proving Boot -> Town works; real movement/camera/
-  tilemap/collision is Phase 1).
+- Town scene placeholder (`scenes/world/Town.tscn`) proving Boot -> Town
+  works (superseded by the real Phase 1 scene below).
+
+Delivered in Phase 1:
+- `Player.gd` / `Player.tscn` — real 4-directional movement, collision,
+  and a following `Camera2D` with settable limits (see ARCHITECTURE.md
+  Section 5a).
+- `RectMapBuilder` — shared static utility any map controller uses to
+  paint its `TileMapLayer` ground and spawn `Obstacle` colliders from a
+  list of open-area rectangles.
+- `MapTransitionArea` — generic doorway trigger, a Phase 1 stand-in for
+  the Phase 5 Gate-driven entry point.
+- `Town.tscn`/`town.gd` rebuilt with a real tilemap, border collision,
+  and a doorway to Cinderfall Woods.
+- `CinderfallWoods.tscn`/`cinderfall_woods.gd` — the prototype's first
+  real dungeon: a main corridor plus one branching alcove (the
+  "bonus loot area" exploration pillar from GAME_DESIGN.md Section 7),
+  and a doorway back to Waymark.
+- Shared placeholder tile art (`art/tiles/`) + `world_tileset.tres`,
+  owned jointly with Agent 7 (Agent 7 replaces the placeholder SVGs
+  with real pixel art later without touching `RectMapBuilder` or any
+  map controller).
 
 Gate resolution logic itself (`gate_resolver.gd`) is data-driven and
 scheduled for Phase 5, but its schema and contract are fixed now
-(ARCHITECTURE.md Section 7) so nothing downstream has to guess.
+(ARCHITECTURE.md Section 7) so nothing downstream has to guess. Normal
+maps are currently entered through a plain `MapTransitionArea` doorway
+in Town — Phase 5 replaces that doorway's trigger with real Gate
+combination entry (the destination logic does not change).
 
 ## AGENT 5 — UI / UX
 

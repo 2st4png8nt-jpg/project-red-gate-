@@ -8,7 +8,11 @@ Not an MMO. No accounts, no live service, no persistent online world.
 
 ## Status
 
-Phase 0 (Foundation) complete. See `docs/PROGRESS.md`.
+Phase 1 (Movement + World) complete. See `docs/PROGRESS.md`.
+
+## Controls
+
+- Move: WASD or arrow keys
 
 ## Start here
 
@@ -27,7 +31,11 @@ godot4 --path .                              # open in editor
 godot4 --headless --path . --quit-after 5    # headless smoke run
 ```
 
-The current build boots straight to a placeholder Waymark (town) scene
-that confirms the core autoload chain and scene-transition architecture
-work end to end. There is no movement, combat, or Gate UI yet — see
-`docs/PROGRESS.md` for what's next (Phase 1: Movement + World).
+The current build boots to Waymark (town): walk around with WASD/arrow
+keys, and walk into the doorway on the east wall to reach Cinderfall
+Woods (the prototype's first dungeon, with a branching side path). Walk
+into its west doorway to return to Waymark. There is no combat, gear,
+or Gate UI yet — see `docs/PROGRESS.md` for what's next (Phase 2: Combat).
+
+All tile art is deliberately placeholder (solid-color squares) — see
+`docs/GAME_DESIGN.md` Section 7 on art direction.
