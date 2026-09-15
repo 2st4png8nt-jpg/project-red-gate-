@@ -1,9 +1,16 @@
 extends CanvasLayer
 # Inventory/Equipment screen. Reads GameState.player directly (there is
 # only ever one local player) and mutates it only through
-# Inventory/EquipmentManager helpers — no equip/stat math lives here.
-# Equipment *comparison* (before/after preview) is Phase 4 — this is
-# just equip/unequip.
+# Inventory/EquipmentManager helpers — no equip/stat math lives here,
+# including the Phase 4 comparison text (_format_comparison reads
+# EquipmentData bonus fields directly rather than computing damage or
+# anything StatsCalculator-shaped).
+
+# (label, EquipmentData bonus field) pairs shown in the comparison text.
+const COMPARISON_FIELDS := [
+	["ATK", "attack_bonus"], ["DEF", "defense_bonus"], ["MAG", "magic_power_bonus"],
+	["SPD", "speed_bonus"], ["HP", "max_hp_bonus"], ["MP", "max_mp_bonus"],
+]
 
 @onready var stats_label: Label = $Root/StatsLabel
 @onready var equipped_list: VBoxContainer = $Root/EquippedList
@@ -55,7 +62,7 @@ func _add_item_row(item: ItemData) -> void:
 	var row := HBoxContainer.new()
 	var text := Label.new()
 	if item is EquipmentData:
-		text.text = "%s (%s %s)" % [item.display_name, item.rarity, item.slot]
+		text.text = "%s (%s %s) — %s" % [item.display_name, item.rarity, item.slot, _format_comparison(item)]
 	elif item is ConsumableData:
 		text.text = "%s (heals %d HP, %d MP)" % [item.display_name, item.heal_hp, item.heal_mp]
 	else:
@@ -67,6 +74,32 @@ func _add_item_row(item: ItemData) -> void:
 		btn.pressed.connect(_on_equip_pressed.bind(item))
 		row.add_child(btn)
 	items_list.add_child(row)
+
+## Textual before/after preview vs. whatever currently occupies this
+## item's slot — e.g. "ATK+8, HP+5" or "(no change)". Godot's Resource
+## exposes @export fields through get(), so this works for any bonus
+## field without a match statement per stat.
+func _format_comparison(item: EquipmentData) -> String:
+	var current: EquipmentData = null
+	match item.slot:
+		"weapon":
+			current = GameState.player.equipped_weapon
+		"armor":
+			current = GameState.player.equipped_armor
+		"accessory":
+			current = GameState.player.equipped_accessory
+	var deltas: Array[String] = []
+	for pair in COMPARISON_FIELDS:
+		var label: String = pair[0]
+		var field: String = pair[1]
+		var new_val: int = item.get(field)
+		var cur_val: int = 0 if current == null else current.get(field)
+		var delta := new_val - cur_val
+		if delta != 0:
+			deltas.append("%s%+d" % [label, delta])
+	if deltas.is_empty():
+		return "(no change)"
+	return "vs. equipped: " + ", ".join(deltas)
 
 func _on_equip_pressed(item: EquipmentData) -> void:
 	var previous := EquipmentManager.equip(GameState.player, item)

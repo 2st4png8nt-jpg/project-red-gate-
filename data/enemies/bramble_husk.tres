@@ -15,4 +15,4 @@ speed = 3
 xp_reward = 8
 gold_reward = 4
 skill_ids = Array[String](["bramble_husk_thorn_whip"])
-loot_table_id = ""
+loot_table_id = "cinderfall_common_loot"

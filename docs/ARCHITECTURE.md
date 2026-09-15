@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Project Red Gate
 
 Owner: Lead / Architect
-Status: Phase 3 (Progression)
+Status: Phase 4 (Loot)
 
 This document is the technical source of truth. It describes how the
 systems fit together and where the boundaries between agent-owned areas
@@ -47,7 +47,7 @@ scripts/
   world/              Agent 4 (World/Gate): player movement, map transitions, map controllers
   gates/              Agent 4 (World/Gate): Gate combination resolution
   ui/                 Agent 5 (UI/UX): all Control-based UI scripts
-  enemies/            Agent 6 (Enemy/Content): enemy behavior scripts
+  enemies/            Agent 6 (Enemy/Content): enemy behavior scripts, LootRoller
   audio/              Agent 8 (Audio): audio manager, playback hooks
 
 scenes/
@@ -63,7 +63,8 @@ data/                 Content, as .tres Resource files (data-driven, no logic)
   gates/              Agent 4 (keyword pool + combination table)
   skills/             Agent 2 (player + enemy SkillData rows)
   enemies/            Agent 6
-  encounters/         Agent 6 (single-enemy EncounterData rows; loot tables are Phase 4)
+  encounters/         Agent 6 (single-enemy EncounterData rows)
+  loot/               Agent 6 (LootTableData rows, referenced by EnemyData.loot_table_id)
 
 art/                  Agent 7: sprites, tiles, UI art (placeholders acceptable)
 assets/               Agent 7: misc non-code assets
@@ -223,7 +224,8 @@ Exposed signals (UI reads state only through these plus the public
   `"resolving"`, `"enemy_turn"`, `"won"`, `"lost"`, `"fled"`
 - `action_resolved(message: String)` — one line for the message log
 - `hp_mp_changed` — a generic "redraw stat bars" ping
-- `battle_won(xp: int, gold: int, leveled_up: bool)`,
+- `battle_won(xp: int, gold: int, leveled_up: bool, loot_item_name: String, clue_discovered: bool)` —
+  `loot_item_name` is `""` when nothing dropped (see Section 6b);
   `battle_lost`, `battle_fled`
 
 Damage formulas (deliberately simple — see GAME_DESIGN.md Section 27,
@@ -285,8 +287,9 @@ UI built on this layer (Agent 5):
   Unequip buttons and inventory items with Equip buttons (for
   `EquipmentData`) or just a description (for `ConsumableData`), plus
   the player's current effective stats. Present in every map because
-  it lives on `Player`, not on a per-map scene. Equipment *comparison*
-  (before/after preview) is explicitly Phase 4 scope, not built here.
+  it lives on `Player`, not on a per-map scene. Each equipment row also
+  shows a Phase 4 comparison string (see Section 6b) vs. whatever
+  currently occupies that slot.
 - **`ShopUI`** (`scenes/ui/ShopUI.tscn`, instanced by `town.gd`, opened
   by walking into `ShopTrigger`) — a data-driven item list (the
   `item_ids` the shop sells is set on the instance by `town.gd`, not
@@ -300,6 +303,37 @@ UI (`scripts/ui/battle_ui.gd` + `scenes/ui/BattleUI.tscn`, Agent 5)
 reads battle state via the signals/fields above and drives the command
 menu; it contains no combat math and never mutates `BattleManager`
 fields directly.
+
+## 6b. Loot Layer (Phase 4)
+
+New schema: **`LootTableData`** (`scripts/data/loot_table_data.gd`) —
+`drop_chance: float` (0..1) plus parallel `item_ids: Array[String]` /
+`weights: Array[int]`. Deliberately flat (not an array of a nested
+per-entry Resource) so a whole table is one easy-to-hand-author `.tres`
+— see AGENT_CONTRACTS.md's Open Interface Decisions Log if that choice
+needs revisiting later (e.g. once entries need their own per-entry drop
+chance instead of one shared table-level chance).
+
+**`LootRoller`** (`scripts/enemies/loot_roller.gd`, Agent 6, static) —
+`roll(table: LootTableData) -> String` returns an item id or `""`.
+First rolls `drop_chance`; if that passes, picks weight-proportionally
+among `item_ids`. Content lives in `data/loot/`, referenced by
+`EnemyData.loot_table_id`.
+
+`BattleManager._win()` (Phase 4 addition) rolls the defeated enemy's
+loot table (if `loot_table_id` is set), adds any resulting item via
+`Inventory.add_item`, and — new `EnemyData.gate_clue_id` field — calls
+`GameState.discover_clue()` if set. Both feed into the richer
+`action_resolved` victory message and the extended `battle_won` signal
+above, so `BattleUI` never has to ask `BattleManager` "what happened"
+after the fact.
+
+`InventoryUI`'s equipment comparison (Section 6a) reads
+`EquipmentData`'s `@export` bonus fields directly via `Resource.get(field_name)`
+rather than a per-stat match statement — see `_format_comparison()` in
+`scripts/ui/inventory_ui.gd`. It duplicates none of `StatsCalculator`'s
+logic; it only diffs one candidate item against whatever already
+occupies that slot.
 
 ## 7. Gate Resolution Contract
 

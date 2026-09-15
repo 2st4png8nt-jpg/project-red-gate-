@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EquipmentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/equipment_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "cinderfall_cleaver"
+display_name = "Cinderfall Cleaver"
+description = "A well-balanced blade still warm from the woods' ash."
+rarity = "uncommon"
+level_requirement = 0
+value = 40
+source = "Cinderfall Woods drop"
+slot = "weapon"
+attack_bonus = 14

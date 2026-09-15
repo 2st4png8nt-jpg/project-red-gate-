@@ -8,7 +8,7 @@ Not an MMO. No accounts, no live service, no persistent online world.
 
 ## Status
 
-Phase 3 (Progression) complete. See `docs/PROGRESS.md`.
+Phase 4 (Loot) complete. See `docs/PROGRESS.md`.
 
 ## Controls
 
@@ -44,9 +44,16 @@ the branch alcove to the north.
 The gold marker in Waymark opens the shop — spend battle gold on a
 weapon, armor, an accessory, or a healing draught. Press `I` anywhere
 to open your Inventory and equip what you've bought; equipped gear
-changes your stats immediately, including in the very next fight.
-There is no loot from combat or a Gate UI yet — see `docs/PROGRESS.md`
-for what's next (Phase 4: Loot).
+changes your stats immediately, including in the very next fight, and
+each equippable item now shows how it compares to whatever you have
+equipped in that slot.
+
+Cinderfall Woods' enemies can now also drop gear directly: the two
+common enemies sometimes drop an Ember Draught or the uncommon
+Cinderfall Cleaver, and the Cinder Wraith always drops the rare
+Ashcinder Guard — and, quietly, a clue toward the Red Gate. There is no
+Gate UI to use that clue yet — see `docs/PROGRESS.md` for what's next
+(Phase 5: Gates).
 
 All tile art is deliberately placeholder (solid-color squares) — see
 `docs/GAME_DESIGN.md` Section 7 on art direction.

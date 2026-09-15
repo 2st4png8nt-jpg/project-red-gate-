@@ -84,11 +84,13 @@ func _on_turn_state_changed(state_name: String) -> void:
 func _on_action_resolved(message: String) -> void:
 	message_label.text = message
 
-func _on_battle_won(xp: int, gold: int, leveled_up: bool) -> void:
+func _on_battle_won(xp: int, gold: int, leveled_up: bool, loot_item_name: String, clue_discovered: bool) -> void:
 	command_menu.hide()
 	skill_menu.hide()
 	var extra := " You leveled up!" if leveled_up else ""
-	message_label.text = "Victory! +%d XP, +%d gold.%s" % [xp, gold, extra]
+	var loot_text := " Found: %s!" % loot_item_name if loot_item_name != "" else ""
+	var clue_text := " A note falls from the wreckage..." if clue_discovered else ""
+	message_label.text = "Victory! +%d XP, +%d gold.%s%s%s" % [xp, gold, loot_text, clue_text, extra]
 	await get_tree().create_timer(1.2).timeout
 	SceneManager.go_to_map(GameState.current_map_id)
 

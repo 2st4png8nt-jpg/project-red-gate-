@@ -15,3 +15,4 @@ class_name EnemyData
 @export var gold_reward: int = 2
 @export var skill_ids: Array[String] = []
 @export var loot_table_id: String = ""
+@export var gate_clue_id: String = "" # discovered via GameState.discover_clue() on defeat, if set

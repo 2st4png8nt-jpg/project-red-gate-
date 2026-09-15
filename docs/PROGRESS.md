@@ -7,6 +7,102 @@ Section 28).
 
 ---
 
+## 2026-09-15 — Phase 4: Loot established
+
+STATUS: COMPLETE
+
+IMPLEMENTED:
+- `LootTableData` schema (flat parallel `item_ids`/`weights` arrays, a
+  `drop_chance`) and `LootRoller` (`scripts/enemies/loot_roller.gd`,
+  static): drop-chance gate, then a weight-proportional pick.
+- Two loot tables: `cinderfall_common_loot` (60% chance, 4:1 weighted
+  between the Ember Draught and the new Cinderfall Cleaver — Ember Wisp
+  and Bramble Husk both use it) and `cinder_wraith_loot` (100% chance,
+  the new Ashcinder Guard).
+- Two new items: Cinderfall Cleaver (uncommon weapon) and Ashcinder
+  Guard (rare armor) — the prototype's first Uncommon/Rare gear
+  actually reachable in the world, not just the Common-tier shop stock
+  from Phase 3.
+- New `EnemyData.gate_clue_id` field; set on the Cinder Wraith
+  (`"cinder_wraith_note"`). `BattleManager._win()` now calls
+  `GameState.discover_clue()` when it's set — the "boss drop confirms
+  the final keyword" discovery source from GAME_DESIGN.md Section 8 is
+  now real, even though the Gate UI that makes it *mean* something to
+  the player is still Phase 5.
+- `BattleManager._win()` rolls loot and folds both loot and the clue
+  into the victory message and the (now 5-parameter) `battle_won`
+  signal; `BattleUI` updated to match.
+- `InventoryUI` equipment rows now show a comparison string against
+  whatever's currently in that slot (`vs. equipped: ATK+8`, or
+  `(no change)`), reading `EquipmentData`'s bonus fields directly via
+  `Resource.get()` rather than duplicating `StatsCalculator`.
+
+FILES CHANGED: see this milestone's commit.
+
+INTERFACES CHANGED:
+- `BattleManager.battle_won` signal grew two parameters
+  (`loot_item_name: String`, `clue_discovered: bool`).
+- `EnemyData` gained `gate_clue_id: String` (additive, defaults to `""`).
+- New Section 6b in ARCHITECTURE.md for the loot layer; schema entries
+  added to AGENT_CONTRACTS.md for `LootTableData` and the `EnemyData`
+  field.
+
+TESTS:
+- `godot4 --headless --path . --quit-after 10`: Boot -> Town, no
+  runtime errors. Re-verified Cinderfall Woods still boots cleanly.
+- Temporary self-test (removed before commit) exercised real code
+  paths rather than just checking they parse:
+  - `LootRoller` edge cases: a 100%-chance single-item table always
+    returns that item, a 0%-chance table always returns `""`, an empty
+    table returns `""`.
+  - `LootRoller` weighted distribution: 400 rolls of a 3:1-weighted
+    two-item table landed at 75%/25% almost exactly (299/101), a
+    strong statistical confirmation the weighting math is right, not
+    just "it returns something."
+  - A real `_win()` call against the Cinder Wraith encounter: the
+    `battle_won` signal carried `loot_item_name="Ashcinder Guard"` and
+    `clue_discovered=true` exactly as expected (100% drop chance, one
+    item), the player's inventory grew by exactly one, and
+    `GameState.known_gate_clues` gained `"cinder_wraith_note"`.
+  - `InventoryUI._format_comparison()`: with nothing equipped, the
+    Rusted Shortsword showed `ATK+6`; equipped against itself, `(no
+    change)`; the Cinderfall Cleaver against the equipped shortsword,
+    `ATK+8` (14 - 6) — confirms the diff is against the *equipped*
+    item, not the base stat.
+- **One test-harness bug, same pattern as Phase 3**: the comparison
+  test function used `await` internally but was called without
+  `await` from the outer self-test, so `SceneManager.go_to_town()` ran
+  and freed the calling scene before the comparison test's awaited
+  frames resumed — its output silently never printed rather than
+  erroring loudly. No production bug this round once that was fixed;
+  every real code path checked out on the first correct test run.
+
+KNOWN ISSUES:
+- Loot only exists in Cinderfall Woods; Silent Marsh has no map, no
+  enemies, and no loot yet (still waiting on that map being built).
+- No "rewards" beyond loot/XP/gold/clues — no quest rewards, no
+  discrete "treasure chest" pickups outside combat. Not called for by
+  the vertical-slice definition yet either.
+- Equipment comparison is text-only (no color-coding of positive vs.
+  negative deltas) — fine for a prototype, worth revisiting once real
+  UI art exists.
+- As with every prior phase: validated headlessly and via targeted
+  logic self-tests, not by clicking through a real window. Loot text
+  legibility, comparison-string readability, and drop-rate "feel" all
+  need an editor playtest pass.
+
+FOLLOW-UP (Phase 5 — Gates):
+- The Gate interface in Waymark (currently the doorway to Cinderfall
+  Woods is a plain walk-up trigger — Phase 5 replaces its *trigger*
+  with real Gate combination entry per ARCHITECTURE.md Section 5a).
+- Gate keyword combination UI, wired to the already-seeded
+  `data/gates/` content and the `known_gate_clues`/`cinder_wraith_note`
+  the player can now actually earn.
+- The Red Gate special destination and Cindermourn, the unique weapon.
+- STOP AND TEST before Phase 6.
+
+---
+
 ## 2026-09-15 — Phase 3: Progression established
 
 STATUS: COMPLETE

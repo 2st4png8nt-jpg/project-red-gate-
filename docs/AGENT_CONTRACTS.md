@@ -58,11 +58,11 @@ Does not own combat UI or battle logic.
 
 Owns: `scripts/combat/`, `data/skills/`.
 
-Must consume (not redefine): `PlayerData` from Agent 3, `EnemyData` from
-Agent 6, equipment effects from Agent 3 (not yet wired into damage math
-— Phase 3/4). Exposes the interface in ARCHITECTURE.md Section 6. Does
-not own inventory UI or the command menu itself (Agent 5) — only the
-state machine those UI elements drive.
+Must consume (not redefine): `PlayerData` from Agent 3, `EnemyData` and
+`LootTableData` from Agent 6, equipment effects from Agent 3 (via
+`StatsCalculator`, wired in Phase 3). Exposes the interface in
+ARCHITECTURE.md Section 6/6b. Does not own inventory UI or the command
+menu itself (Agent 5) — only the state machine those UI elements drive.
 
 Delivered in Phase 2:
 - `BattleManager` (`scripts/combat/battle_manager.gd`) — full state
@@ -77,6 +77,13 @@ Delivered in Phase 2:
   `BattleManager`'s state init from `_ready()` to `_enter_tree()` so
   its child `BattleUI` never reads `enemy`/`player` as null — see
   ARCHITECTURE.md Section 6 for why.
+
+Delivered in Phase 4:
+- `BattleManager._win()` now rolls the defeated enemy's loot table (if
+  any) and discovers its gate clue (if any) — see ARCHITECTURE.md
+  Section 6b. `battle_won`'s signature grew two params
+  (`loot_item_name`, `clue_discovered`); `BattleUI`'s handler was
+  updated to match.
 
 ## AGENT 3 — RPG / Gear
 
@@ -200,9 +207,15 @@ Delivered in Phase 3:
   screen instanced by `town.gd`, reading which items are for sale from
   an exported `item_ids` list (data, not a hardcoded switch statement).
 
+Delivered in Phase 4:
+- `InventoryUI` item rows now show a comparison string (`_format_comparison()`)
+  against whatever's currently in that item's slot, e.g. `vs. equipped: ATK+8`.
+  Reads `EquipmentData` bonus fields directly via `Resource.get(field)`;
+  does not duplicate `StatsCalculator`'s logic.
+
 ## AGENT 6 — Enemy / Content
 
-Owns: `data/enemies/`, `data/encounters/`, `scripts/enemies/`.
+Owns: `data/enemies/`, `data/encounters/`, `data/loot/`, `scripts/enemies/`.
 
 Not started in Phase 0. `EnemyData` schema is defined by Agent 1/Lead
 now so Agent 3/Agent 2 can see its shape; content authoring is Phase 2/4.
@@ -216,9 +229,26 @@ Delivered in Phase 2:
   encounter; the Cinder Wraith's has `can_flee = false`.
 - Silent Marsh's enemies (Tideling, Hollow Stalker) are deferred until
   that map is actually built — no content without a place to use it.
-- `scripts/enemies/` (enemy-specific behavior scripts, beyond "use
-  skill_ids[0]") remains empty; not needed until enemy AI grows beyond
-  Phase 2's single-skill default.
+
+Delivered in Phase 4:
+- `LootTableData` schema + `LootRoller` (`scripts/enemies/loot_roller.gd`,
+  static) — see ARCHITECTURE.md Section 6b.
+- `data/loot/cinderfall_common_loot.tres` (60% chance, weighted 4:1
+  between the Ember Draught and the new Cinderfall Cleaver) wired to
+  both Ember Wisp and Bramble Husk via `loot_table_id`.
+- `data/loot/cinder_wraith_loot.tres` (100% chance, the new Ashcinder
+  Guard) wired to the Cinder Wraith, whose row also got a new
+  `gate_clue_id = "cinder_wraith_note"` — the "boss drop confirms the
+  final keyword" discovery source from GAME_DESIGN.md Section 8. The
+  Gate UI that makes that clue *mean* anything to the player is still
+  Phase 5; this only makes `GameState.known_gate_clues` accumulate it.
+- Two new items in `data/items/`: Cinderfall Cleaver (uncommon weapon,
+  a Cinderfall Woods drop) and Ashcinder Guard (rare armor, the Cinder
+  Wraith's signature reward) — the first Uncommon/Rare gear actually
+  reachable in the world, versus Phase 3's Common-only shop stock.
+- `scripts/enemies/` now holds `loot_roller.gd`; still no per-enemy
+  behavior scripts beyond "use `skill_ids[0]`" — not needed until enemy
+  AI grows beyond Phase 2's single-skill default.
 
 ## AGENT 7 — Art / Presentation
 
@@ -293,6 +323,7 @@ ARCHITECTURE.md Section 8 save-data notes if it affects save data).
 - `gold_reward: int`
 - `skill_ids: Array[String]`
 - `loot_table_id: String`
+- `gate_clue_id: String` — added Phase 4; discovered via `GameState.discover_clue()` on defeat if non-empty
 
 ### `GateKeywordData` (scripts/data/gate_keyword_data.gd)
 - `word: String`
@@ -327,6 +358,12 @@ See Agent 3 section above for the full field list.
 ### `ConsumableData extends ItemData` (scripts/data/consumable_data.gd) — added Phase 3
 - `heal_hp: int`
 - `heal_mp: int`
+
+### `LootTableData` (scripts/data/loot_table_data.gd) — added Phase 4
+- `id: String`
+- `drop_chance: float` — 0..1
+- `item_ids: Array[String]`
+- `weights: Array[int]` — parallel to `item_ids`
 
 ---
 

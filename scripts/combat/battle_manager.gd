@@ -9,7 +9,7 @@ class_name BattleManager
 signal turn_state_changed(state_name: String) # "player_input" | "resolving" | "enemy_turn" | "won" | "lost" | "fled"
 signal action_resolved(message: String)
 signal hp_mp_changed
-signal battle_won(xp: int, gold: int, leveled_up: bool)
+signal battle_won(xp: int, gold: int, leveled_up: bool, loot_item_name: String, clue_discovered: bool)
 signal battle_lost
 signal battle_fled
 
@@ -148,8 +148,29 @@ func _win() -> void:
 	var gold := enemy.gold_reward
 	player.gold += gold
 	var leveled_up := Leveling.grant_xp(player, xp)
-	action_resolved.emit("Victory! %s defeated." % enemy.display_name)
-	battle_won.emit(xp, gold, leveled_up)
+
+	var loot_item_name := ""
+	if enemy.loot_table_id != "":
+		var table: LootTableData = DataLoader.load_resource("res://data/loot/%s.tres" % enemy.loot_table_id)
+		var loot_id := LootRoller.roll(table)
+		if loot_id != "":
+			var item: ItemData = DataLoader.load_resource("res://data/items/%s.tres" % loot_id)
+			if item != null:
+				Inventory.add_item(player, item)
+				loot_item_name = item.display_name
+
+	var clue_discovered := false
+	if enemy.gate_clue_id != "":
+		GameState.discover_clue(enemy.gate_clue_id)
+		clue_discovered = true
+
+	var victory_msg := "Victory! %s defeated." % enemy.display_name
+	if loot_item_name != "":
+		victory_msg += " You found %s!" % loot_item_name
+	if clue_discovered:
+		victory_msg += " A strange note falls from the wreckage..."
+	action_resolved.emit(victory_msg)
+	battle_won.emit(xp, gold, leveled_up, loot_item_name, clue_discovered)
 
 func _lose() -> void:
 	state = State.LOST

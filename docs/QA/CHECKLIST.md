@@ -2,6 +2,25 @@
 
 Owner: Agent 9 (QA)
 
+## Exit criteria for Phase 4 (Loot) — manual, needs a display
+
+Not yet run against this build.
+
+- [ ] Defeating Ember Wisp or Bramble Husk sometimes (not always) drops
+      an item — either the Ember Draught or the Cinderfall Cleaver —
+      and the victory message names it when it does.
+- [ ] Defeating the Cinder Wraith always drops the Ashcinder Guard and
+      always shows the "note falls from the wreckage" message.
+- [ ] Dropped items actually appear in the Inventory screen afterward.
+- [ ] In the Inventory screen, each equippable item shows a comparison
+      string vs. whatever's currently equipped in that slot, and it
+      updates correctly after equipping/unequipping (compare against a
+      *different* item now, not the original baseline).
+- [ ] The comparison string reads as "(no change)" when comparing an
+      equipped item against itself.
+- [ ] No script errors appear in the console across several dropped
+      loot rolls and inventory screen visits.
+
 ## Exit criteria for Phase 3 (Progression) — manual, needs a display
 
 Not yet run against this build.

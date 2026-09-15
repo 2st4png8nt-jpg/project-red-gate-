@@ -15,4 +15,5 @@ speed = 5
 xp_reward = 25
 gold_reward = 15
 skill_ids = Array[String](["cinder_wraith_cinder_burst"])
-loot_table_id = ""
+loot_table_id = "cinder_wraith_loot"
+gate_clue_id = "cinder_wraith_note"
