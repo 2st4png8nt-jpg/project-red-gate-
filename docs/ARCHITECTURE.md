@@ -1,0 +1,198 @@
+# ARCHITECTURE.md — Project Red Gate
+
+Owner: Lead / Architect
+Status: Phase 0 (Foundation)
+
+This document is the technical source of truth. It describes how the
+systems fit together and where the boundaries between agent-owned areas
+are. Update it whenever a cross-system interface changes.
+
+---
+
+## 1. Engine & Toolchain
+
+- **Engine:** Godot 4.3 (stable), GDScript.
+- **Why:** free, open-source, first-class 2D pixel-art + tilemap
+  support, UI-heavy menu systems are native (Control nodes), exports to
+  desktop, no paid middleware required.
+- **Renderer:** Forward+ is fine for a 2D prototype; can be switched to
+  `gl_compatibility` later if a target machine needs it. Not a Phase 0
+  decision.
+- **Headless validation:** this sandbox has no display. A headless
+  Godot binary is used for `--check-only` parses and short automated
+  smoke runs. Full visual verification (art, camera feel, animation
+  timing) requires opening the project in the Godot editor on a machine
+  with a display — that step is **not** substitutable by headless runs
+  and must happen before a milestone is called "done" for anything
+  visual.
+
+## 2. Top-Level Folder Map
+
+```
+project.godot
+project_icon.svg
+
+docs/                 Lead Agent: source-of-truth documentation
+  GAME_DESIGN.md
+  ARCHITECTURE.md
+  AGENT_CONTRACTS.md
+  PROGRESS.md
+  QA/                 QA: checklists, bug reports
+
+scripts/
+  core/               Agent 1 (Core Systems): autoloads, state, save/load, events, data loading
+  data/               Agent 1 / Agent 3: Resource *schema* definitions (class_name only, no content)
+  rpg/                Agent 3 (RPG/Gear): player stats, inventory, equipment, leveling, currency
+  combat/             Agent 2 (Combat): battle state machine, commands, damage resolution
+  world/              Agent 4 (World/Gate): player movement, map transitions, map controllers
+  gates/              Agent 4 (World/Gate): Gate combination resolution
+  ui/                 Agent 5 (UI/UX): all Control-based UI scripts
+  enemies/            Agent 6 (Enemy/Content): enemy behavior scripts
+  audio/              Agent 8 (Audio): audio manager, playback hooks
+
+scenes/
+  main/               Boot scene, top-level Main scene
+  world/              Town.tscn, map scenes
+  combat/             Battle.tscn
+  ui/                 UI scenes (HUD, menus, screens)
+
+data/                 Content, as .tres Resource files (data-driven, no logic)
+  items/              Agent 3
+  characters/         Agent 3 (base player stat block)
+  maps/               Agent 4 (map metadata: id, display name, exits, encounter table id)
+  gates/              Agent 4 (keyword pool + combination table)
+  enemies/            Agent 6
+  encounters/         Agent 6 (loot tables, spawn tables)
+
+art/                  Agent 7: sprites, tiles, UI art (placeholders acceptable)
+assets/               Agent 7: misc non-code assets
+audio/                Agent 8: music/, sfx/
+tests/                Agent 9 (QA): automated + scripted manual tests
+```
+
+Ownership mirrors CLAUDE.md Section 15. If a file needs to change
+outside the areas above, follow the Section 17 procedure (explain why,
+smallest possible interface change, notify Lead Agent, no redesign).
+
+## 3. Autoload (Singleton) Layer
+
+Registered in `project.godot` under `[autoload]`, load order matters:
+
+1. **EventBus** (`scripts/core/EventBus.gd`) — global signal bus.
+   Systems communicate through signals here instead of reaching into
+   each other directly. No state, no logic beyond `signal` declarations
+   and thin `emit_*` helpers.
+2. **DataLoader** (`scripts/core/DataLoader.gd`) — loads and caches
+   `.tres` Resources from `/data/**` by id. Every other system asks
+   DataLoader for content; nothing does a raw `load()` on a data file
+   outside this autoload.
+3. **GameState** (`scripts/core/GameState.gd`) — holds the current
+   `PlayerData` instance, current map id, and run-level flags (which
+   Gate combinations are known/unlocked, which clues are found). This
+   is the only autoload allowed to hold mutable game-session state.
+4. **SceneManager** (`scripts/core/SceneManager.gd`) — owns switching
+   the active scene (Town <-> Map <-> Battle) via `get_tree().change_scene_to_*`
+   wrappers, plus a simple transition hook UI can fade against.
+5. **SaveLoad** (`scripts/core/SaveLoad.gd`) — serializes `GameState`'s
+   relevant fields to/from `user://save_slot_0.json`. Basic single-slot
+   save is sufficient for the prototype.
+
+Rule: UI and gameplay scripts read from `GameState` and call its methods
+or emit `EventBus` signals. They must not hold their own copy of
+authoritative state (e.g. a battle scene does not keep a second source
+of truth for player HP — it reads/writes through `GameState.player`).
+
+## 4. Data-Driven Content Model
+
+Every content type is a `Resource` subclass (a schema) plus `.tres`
+instances (the content) under `/data/`. This lets Agent 3/4/6 add
+content without touching engine code, per CLAUDE.md Section 20.
+
+Schema locations (Phase 0 deliverable — see AGENT_CONTRACTS.md for the
+exact fields of each):
+
+- `scripts/data/item_data.gd` — `ItemData` (base for all inventory items)
+- `scripts/data/equipment_data.gd` — `EquipmentData extends ItemData`
+- `scripts/data/skill_data.gd` — `SkillData`
+- `scripts/data/enemy_data.gd` — `EnemyData`
+- `scripts/data/gate_keyword_data.gd` — `GateKeywordData`
+- `scripts/data/gate_combination_data.gd` — `GateCombinationData`
+- `scripts/data/map_data.gd` — `MapData`
+
+## 5. Scene / State Flow (Phase 0 minimum)
+
+```
+Boot.tscn (autoloads already initialized by the engine)
+   -> SceneManager.go_to_town()
+Town.tscn
+   -> (Phase 5) Gate interface -> SceneManager.go_to_map(map_id)
+   -> (Phase 1+) Map.tscn -> encounter trigger -> SceneManager.go_to_battle(encounter_id)
+   -> Battle.tscn -> victory/defeat -> SceneManager.return_from_battle()
+```
+
+Phase 0 only needs Boot -> Town to work end to end with no runtime
+errors. Map/Battle scenes arrive in Phase 1/2.
+
+## 6. Combat Interface Contract (established now so Agent 2 and Agent 3
+can work in parallel later — see CLAUDE.md Section 31)
+
+Combat (`scripts/combat/`) must consume, not own:
+- `PlayerData` (stats, current equipment, skills) from `scripts/rpg/`
+- `EnemyData` (stats, abilities) from `scripts/data/` + `/data/enemies/`
+- `EquipmentData` effects, applied as modifiers to base stats
+
+Combat exposes (future phase, documented here so the shape is fixed
+before two agents build against it):
+- `BattleManager.start_battle(encounter_id: String)`
+- signals: `battle_won`, `battle_lost`, `battle_action_resolved(result)`
+
+UI (`scripts/ui/`) reads battle state via these signals/state, never
+mutates combat internals directly.
+
+## 7. Gate Resolution Contract
+
+`scripts/gates/gate_resolver.gd` exposes:
+- `resolve(origin: String, tone: String, sign: String) -> GateResult`
+
+Where `GateResult` (a small typed return, see AGENT_CONTRACTS.md) is one
+of: `KNOWN` (has a destination map id), `SPECIAL` (unlocks the Red Gate),
+`LOCKED` (known but not yet unlocked), `UNKNOWN` (well-formed but not in
+the table), `INVALID` (malformed input — e.g. empty string or a keyword
+outside the current pool). The resolver never throws; every input path
+returns a `GateResult`.
+
+## 8. Save Data Shape (Phase 0 minimum)
+
+```json
+{
+  "player": { "level": 1, "xp": 0, "hp": 20, "mp": 10, "gold": 0, "equipment": {} },
+  "known_gate_clues": [],
+  "unlocked_maps": ["waymark"],
+  "current_map": "waymark"
+}
+```
+
+This will grow; treat it as additive only — do not remove keys without a
+migration note in PROGRESS.md.
+
+## 9. Testing Approach
+
+Godot has no bundled test runner. For the prototype:
+- Prefer small, pure-logic GDScript classes (gate resolver, stat
+  calculator, loot table roller) that can be unit-tested by a plain
+  script run via `godot4 --headless --script tests/xxx.gd`.
+- QA (Agent 9) maintains `/tests/` and `/docs/QA/`.
+- A headless smoke run (`godot4 --headless --path . --quit-after 5`) is
+  run before every commit that touches `.gd`/`.tscn` files, to catch
+  parse/runtime errors early (does not replace opening the project
+  in-editor for anything visual). Note: the very first run against a
+  fresh clone must be `godot4 --headless --editor --quit --path .`
+  once, to build `.godot/global_script_class_cache.cfg` — without it,
+  every `class_name` type (PlayerData, MapData, etc.) fails to resolve
+  on the first headless boot.
+
+## 10. Change Control
+
+Any change to sections 3, 4, 6, 7, or 8 above is a cross-agent interface
+change and must be reflected here by the Lead Agent in the same change
+set that implements it, per CLAUDE.md Section 16.

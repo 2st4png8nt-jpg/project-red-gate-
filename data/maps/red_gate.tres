@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="MapData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "red_gate"
+display_name = "The Red Gate"
+is_special = true
+encounter_table_id = "red_gate_boss"
+scene_path = "res://scenes/world/RedGate.tscn"

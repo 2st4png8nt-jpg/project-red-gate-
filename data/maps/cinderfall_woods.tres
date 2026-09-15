@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="MapData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "cinderfall_woods"
+display_name = "Cinderfall Woods"
+is_special = false
+encounter_table_id = "cinderfall_woods_common"
+scene_path = "res://scenes/world/CinderfallWoods.tscn"
