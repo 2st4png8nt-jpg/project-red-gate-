@@ -24,7 +24,7 @@ static func grant_xp(player: PlayerData, amount: int) -> bool:
 		player.defense += 1
 		player.magic_power += 1
 		player.speed += 1
-		player.hp = player.max_hp
-		player.mp = player.max_mp
+		player.hp = StatsCalculator.effective_max_hp(player)
+		player.mp = StatsCalculator.effective_max_mp(player)
 		leveled_up = true
 	return leveled_up

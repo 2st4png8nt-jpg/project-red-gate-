@@ -7,8 +7,17 @@ extends CharacterBody2D
 const SPEED := 140.0
 
 @onready var camera: Camera2D = $Camera2D
+@onready var inventory_ui: CanvasLayer = $InventoryUI
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_I:
+		inventory_ui.visible = not inventory_ui.visible
 
 func _physics_process(_delta: float) -> void:
+	if inventory_ui.visible:
+		velocity = Vector2.ZERO
+		move_and_slide()
+		return
 	var input_dir := Vector2.ZERO
 	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
 		input_dir.x -= 1

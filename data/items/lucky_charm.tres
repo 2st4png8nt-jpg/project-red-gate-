@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EquipmentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/equipment_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "lucky_charm"
+display_name = "Lucky Charm"
+description = "A small trinket that seems to quicken your step."
+rarity = "common"
+level_requirement = 0
+value = 12
+source = "Waymark shop"
+slot = "accessory"
+speed_bonus = 2

@@ -8,12 +8,13 @@ Not an MMO. No accounts, no live service, no persistent online world.
 
 ## Status
 
-Phase 2 (Combat) complete. See `docs/PROGRESS.md`.
+Phase 3 (Progression) complete. See `docs/PROGRESS.md`.
 
 ## Controls
 
 - Move: WASD or arrow keys
 - Battle: click command buttons (Attack / Skill / Item / Defend / Run)
+- `I`: open/close Inventory (equip/unequip gear)
 
 ## Start here
 
@@ -38,8 +39,14 @@ Woods (the prototype's first dungeon, with a branching side path). Walk
 into its west doorway to return to Waymark. Three orange/red markers in
 Cinderfall Woods start a battle: two common enemies in the main
 corridor, and the Cinder Wraith mini-boss (who won't let you flee) in
-the branch alcove to the north. There is no gear or Gate UI yet — see
-`docs/PROGRESS.md` for what's next (Phase 3: Progression).
+the branch alcove to the north.
+
+The gold marker in Waymark opens the shop — spend battle gold on a
+weapon, armor, an accessory, or a healing draught. Press `I` anywhere
+to open your Inventory and equip what you've bought; equipped gear
+changes your stats immediately, including in the very next fight.
+There is no loot from combat or a Gate UI yet — see `docs/PROGRESS.md`
+for what's next (Phase 4: Loot).
 
 All tile art is deliberately placeholder (solid-color squares) — see
 `docs/GAME_DESIGN.md` Section 7 on art direction.

@@ -47,7 +47,7 @@ func start_battle(encounter_id: String) -> void:
 func player_attack() -> void:
 	if state != State.PLAYER_INPUT:
 		return
-	var dmg := maxi(1, player.attack - enemy.defense)
+	var dmg := maxi(1, StatsCalculator.effective_attack(player) - enemy.defense)
 	enemy_hp = maxi(0, enemy_hp - dmg)
 	action_resolved.emit("You attack for %d damage." % dmg)
 	_after_player_action()
@@ -61,10 +61,10 @@ func player_use_skill(skill: SkillData) -> void:
 	player.mp -= skill.mp_cost
 	if skill.target_type == "self":
 		var healed := skill.power
-		player.hp = mini(player.max_hp, player.hp + healed)
+		player.hp = mini(StatsCalculator.effective_max_hp(player), player.hp + healed)
 		action_resolved.emit("You use %s and recover %d HP." % [skill.display_name, healed])
 	else:
-		var dmg := maxi(1, skill.power + player.magic_power - enemy.defense)
+		var dmg := maxi(1, skill.power + StatsCalculator.effective_magic_power(player) - enemy.defense)
 		enemy_hp = maxi(0, enemy_hp - dmg)
 		action_resolved.emit("You use %s for %d damage." % [skill.display_name, dmg])
 	hp_mp_changed.emit()
@@ -73,11 +73,16 @@ func player_use_skill(skill: SkillData) -> void:
 func player_use_item() -> void:
 	if state != State.PLAYER_INPUT:
 		return
-	if player.inventory.is_empty():
+	var consumable := Inventory.find_first_consumable(player)
+	if consumable == null:
 		action_resolved.emit("No items to use.")
 		return
-	# Item usage arrives with the inventory system (Phase 3/4) — see
-	# AGENT_CONTRACTS.md. Does not consume a turn.
+	Inventory.remove_item(player, consumable)
+	player.hp = mini(StatsCalculator.effective_max_hp(player), player.hp + consumable.heal_hp)
+	player.mp = mini(StatsCalculator.effective_max_mp(player), player.mp + consumable.heal_mp)
+	action_resolved.emit("You use %s. +%d HP, +%d MP." % [consumable.display_name, consumable.heal_hp, consumable.heal_mp])
+	hp_mp_changed.emit()
+	_after_player_action()
 
 func player_defend() -> void:
 	if state != State.PLAYER_INPUT:
@@ -112,12 +117,13 @@ func _enemy_turn() -> void:
 
 	var dmg: int
 	var msg: String
+	var player_defense := StatsCalculator.effective_defense(player)
 	if enemy.skill_ids.size() > 0:
 		var skill: SkillData = DataLoader.load_resource("res://data/skills/%s.tres" % enemy.skill_ids[0])
-		dmg = maxi(1, skill.power + enemy.magic_power - player.defense)
+		dmg = maxi(1, skill.power + enemy.magic_power - player_defense)
 		msg = "%s uses %s for %d damage!" % [enemy.display_name, skill.display_name, dmg]
 	else:
-		dmg = maxi(1, enemy.attack - player.defense)
+		dmg = maxi(1, enemy.attack - player_defense)
 		msg = "%s attacks for %d damage!" % [enemy.display_name, dmg]
 
 	if player_defending:
@@ -151,7 +157,7 @@ func _lose() -> void:
 	# No real defeat penalty in the prototype yet — full heal and send
 	# the player back to Waymark rather than soft-locking a solo
 	# playtester. A real game-over/consequence system is later polish.
-	player.hp = player.max_hp
-	player.mp = player.max_mp
+	player.hp = StatsCalculator.effective_max_hp(player)
+	player.mp = StatsCalculator.effective_max_mp(player)
 	action_resolved.emit("You were defeated...")
 	battle_lost.emit()

@@ -2,6 +2,31 @@
 
 Owner: Agent 9 (QA)
 
+## Exit criteria for Phase 3 (Progression) — manual, needs a display
+
+Not yet run against this build.
+
+- [ ] Pressing `I` in Waymark or Cinderfall Woods opens the Inventory
+      screen and pauses player movement; pressing it again (or Close)
+      resumes movement.
+- [ ] Walking into the shop marker in Waymark opens the shop and pauses
+      movement; Leave closes it and resumes movement.
+- [ ] Buying an item deducts the correct gold and adds it to inventory;
+      trying to buy with insufficient gold is refused with a message
+      and nothing is deducted.
+- [ ] Equipping the Rusted Shortsword/Traveler's Vest/Lucky Charm from
+      the Inventory screen updates the displayed stats immediately and
+      moves the item from the item list to the equipped list.
+- [ ] Unequipping moves the item back to the inventory list and stats
+      drop back down.
+- [ ] Equipping a weapon actually increases attack damage dealt in the
+      very next battle (no need to leave and re-enter the map).
+- [ ] Using the Ember Draught in battle heals the expected amount and
+      is removed from inventory; using Item with no consumables left
+      reports "No items to use" without ending the turn.
+- [ ] No script errors appear in the console through a full buy ->
+      equip -> fight -> use-item -> unequip loop.
+
 ## Exit criteria for Phase 2 (Combat) — manual, needs a display
 
 Not yet run against this build (see the limitation note at the bottom).

@@ -7,6 +7,99 @@ Section 28).
 
 ---
 
+## 2026-09-15 — Phase 3: Progression established
+
+STATUS: COMPLETE
+
+IMPLEMENTED:
+- `StatsCalculator`, `EquipmentManager`, `Inventory` (`scripts/rpg/`):
+  effective-stat computation from base stats + equipped gear, equip/
+  unequip with hp/mp clamping, and thin inventory add/remove/find
+  helpers. See ARCHITECTURE.md Section 6a for the full interface.
+- `ConsumableData extends ItemData` schema.
+- 4 real items in `data/items/`: Rusted Shortsword, Traveler's Vest,
+  Lucky Charm (equipment — matching GAME_DESIGN.md Section 11's example
+  table exactly), and the Ember Draught consumable.
+- `BattleManager` now reads all player combat stats through
+  `StatsCalculator` instead of `PlayerData`'s raw fields, so equipping
+  something changes combat immediately, not just after the next battle
+  loads. `player_use_item()` actually works now (was a Phase 2 stub).
+- `InventoryUI`: equip/unequip screen, a child of `Player.tscn` so it's
+  available in every map, toggled with `I`. Shows current effective
+  stats live.
+- `ShopUI` + `ShopTrigger`: a Waymark shop selling the 4 items above,
+  a real currency sink for the gold Phase 2's battles produce.
+
+FILES CHANGED: see this milestone's commit.
+
+INTERFACES CHANGED:
+- `BattleManager`'s internal stat reads changed from `player.attack`
+  etc. to `StatsCalculator.effective_attack(player)` etc. — no change
+  to `BattleManager`'s public API/signals, so `BattleUI` needed only a
+  display-value fix (HP/MP bars now show effective max, not base max).
+- New Section 6a in ARCHITECTURE.md for the progression layer; new
+  Open Interface Decision recorded in AGENT_CONTRACTS.md for why
+  equipment bonuses are computed on read rather than mutated on equip.
+
+TESTS:
+- `godot4 --headless --path . --quit-after 10`: Boot -> Town, no
+  runtime errors. Re-verified Cinderfall Woods still boots cleanly
+  (its `Player` instance now also carries `InventoryUI`).
+- Temporary self-test (removed before commit) drove the real Phase 3
+  code paths end to end, not just checked that they parse:
+  1. Bought all 4 shop items via `ShopUI._on_buy_pressed()` directly —
+     gold and inventory size matched exactly (100 -> 50 gold, 4 items).
+  2. Equipped weapon+armor+accessory via `EquipmentManager.equip()` —
+     `StatsCalculator` reported exactly base+bonus for attack, defense,
+     speed, and max HP, and the previously-empty slots correctly held
+     nothing to return to inventory (inventory dropped from 4 to 1,
+     just the consumable).
+  3. Started a real `Battle.tscn` and called `player_attack()` — damage
+     matched `effective_attack - enemy.defense` exactly (8, not the
+     base-stat value of 2), proving the equipment bonus is live in
+     actual combat, not just in isolated stat queries.
+  4. Used the Ember Draught via `player_use_item()` — healed the exact
+     `heal_hp` amount and removed the item from inventory.
+  5. Unequipped the weapon — attack dropped back to base and the sword
+     returned to inventory.
+- **Two bugs found while writing this test, both in the test harness,
+  not production code** (noted here so the pattern is recognizable
+  next time): (a) assigning an untyped array literal to a property
+  declared `Array[String]` through a generically-`Node`-typed variable
+  fails at runtime — Godot's dynamic property setter enforces the
+  declared array type strictly, so the literal needs its own
+  `Array[String]`-typed intermediate variable first; (b) calling an
+  `await`-using test function without `await`ing it from `_ready()`
+  lets the very next line (`SceneManager.go_to_town()`) run — and free
+  the calling scene — before the test coroutine resumes, producing a
+  confusing "null tree" error far from the real mistake. A third
+  apparent failure (item use silently doing nothing) turned out to be
+  `BattleManager` correctly refusing the action because the battle was
+  still mid-turn — the test needed to wait out the enemy-turn delay
+  first, same lesson as Phase 2 about `--quit-after` counting frames.
+
+KNOWN ISSUES:
+- No equipment *comparison* UI (showing before/after stats before
+  committing to an equip) — explicitly Phase 4 scope.
+- No loot drops from combat yet — the only way to get equipment is the
+  Waymark shop. Phase 4 adds drop tables.
+- Inventory has no scrolling; if it grows large it will overflow the
+  screen. Fine for the prototype's current ~5 items, revisit if that
+  changes.
+- Buying/equipping/using items has not been clicked through in a real
+  window — same caveat as every prior phase, headless + logic
+  self-tests aren't a substitute for an editor playtest pass.
+
+FOLLOW-UP (Phase 4 — Loot):
+- Loot tables and equipment drops from Cinderfall Woods encounters
+  (the Cinder Wraith should drop something worth the fight).
+- Rarity beyond "common" actually appearing in the world (Uncommon/Rare
+  gear per GAME_DESIGN.md Section 11's progression table).
+- Equipment comparison UI in `InventoryUI`.
+- STOP AND TEST before Phase 5.
+
+---
+
 ## 2026-09-15 — Phase 2: Combat established
 
 STATUS: COMPLETE

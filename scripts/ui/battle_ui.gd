@@ -53,8 +53,8 @@ func _ready() -> void:
 
 func _refresh_stats() -> void:
 	enemy_hp_label.text = "HP %d/%d" % [battle_manager.enemy_hp, battle_manager.enemy.max_hp]
-	player_hp_label.text = "HP %d/%d" % [battle_manager.player.hp, battle_manager.player.max_hp]
-	player_mp_label.text = "MP %d/%d" % [battle_manager.player.mp, battle_manager.player.max_mp]
+	player_hp_label.text = "HP %d/%d" % [battle_manager.player.hp, StatsCalculator.effective_max_hp(battle_manager.player)]
+	player_mp_label.text = "MP %d/%d" % [battle_manager.player.mp, StatsCalculator.effective_max_mp(battle_manager.player)]
 
 func _on_skill_chosen(skill: SkillData) -> void:
 	_hide_skill_menu()

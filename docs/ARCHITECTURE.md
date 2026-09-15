@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Project Red Gate
 
 Owner: Lead / Architect
-Status: Phase 2 (Combat)
+Status: Phase 3 (Progression)
 
 This document is the technical source of truth. It describes how the
 systems fit together and where the boundaries between agent-owned areas
@@ -188,15 +188,18 @@ in `_ready()`, then instantiates `Player` at its `PlayerSpawn` marker
 and calls `set_camera_limits()`. Any new map (normal or special) should
 follow this same shape.
 
-## 6. Combat Interface Contract (Phase 2 — implemented)
+## 6. Combat Interface Contract (Phase 2/3 — implemented)
 
 Combat (`scripts/combat/battle_manager.gd`, `BattleManager`) consumes,
 not owns:
 - `PlayerData` (`GameState.player` directly — Combat does not copy it)
 - `EnemyData` + its `SkillData` (loaded via `DataLoader` from
   `data/enemies/` and `data/skills/`, keyed by `EncounterData.enemy_id`)
-- `EquipmentData` effects are **not yet applied** in damage math —
-  equipment bonuses land in Phase 3/4 alongside the inventory system.
+- `EquipmentData` effects, via `StatsCalculator` (Phase 3 — see Section
+  6a below). `BattleManager` never reads `player.attack`/`defense`/
+  `magic_power`/`max_hp`/`max_mp` directly; it always goes through
+  `StatsCalculator.effective_*()` so an equipped item's bonus is live
+  the instant it's equipped, not just after the next battle starts.
 
 One `BattleManager` instance lives at the root of `scenes/combat/Battle.tscn`
 (not an autoload — a fresh instance per battle). It reads
@@ -224,18 +227,74 @@ Exposed signals (UI reads state only through these plus the public
   `battle_lost`, `battle_fled`
 
 Damage formulas (deliberately simple — see GAME_DESIGN.md Section 27,
-balance from playtesting, not a spreadsheet up front):
+balance from playtesting, not a spreadsheet up front; `attacker.attack`
+etc. below mean the `StatsCalculator` effective value, not the raw
+`PlayerData` field, for the player's side):
 - Basic attack: `max(1, attacker.attack - defender.defense)`
 - Skill (non-self): `max(1, skill.power + attacker.magic_power - defender.defense)`
 - Skill (`target_type == "self"`): heals `skill.power` HP, no defense involved
 - Defending halves the next hit taken (integer division), one-shot flag
   cleared after it's used once
 - Enemies always use `skill_ids[0]` if they have one, else basic attack
-  — no enemy AI variety yet (Phase 2 scope)
+  — no enemy AI variety yet (Phase 2 scope); enemies have no equipment,
+  so `EnemyData`'s raw fields are used as-is
+- Item command (Phase 3): uses `Inventory.find_first_consumable()` —
+  the first `ConsumableData` in `player.inventory` — and heals its
+  `heal_hp`/`heal_mp`, capped at the effective max. No item-selection
+  submenu yet since there is only one consumable type; revisit once a
+  second one exists.
 
 `Leveling` (`scripts/rpg/leveling.gd`, Agent 3) is a static, placeholder
 XP curve (`xp_to_next_level(level) = level * 20`) called from
 `BattleManager._win()`. Full balancing is Phase 3/4.
+
+## 6a. Progression Layer (Phase 3)
+
+`scripts/rpg/` (Agent 3) gained three static utilities alongside
+`player_data.gd` and `leveling.gd`:
+
+- **`StatsCalculator`** — `effective_attack/defense/magic_power/speed/
+  max_hp/max_mp(player)`, each returning the matching `PlayerData` base
+  field plus the sum of that stat's bonus across
+  `equipped_weapon`/`equipped_armor`/`equipped_accessory` (any bonus
+  field on any slot — a speed-boosting weapon is just as valid as an
+  accessory one; the schema does not restrict bonuses by slot). This is
+  the *only* place equipment math happens; nothing else computes a
+  bonus by hand.
+- **`EquipmentManager`** — `equip(player, item) -> EquipmentData`
+  (returns whatever was previously in that slot, or null) and
+  `unequip(player, slot) -> EquipmentData`. Both clamp `player.hp`/`mp`
+  down if the new effective max is lower than the current value (an
+  unequip can never leave hp/mp displaying above the new max). Neither
+  method touches `player.inventory` — callers (currently only
+  `InventoryUI`) are responsible for moving the returned item into the
+  inventory array and removing the newly-equipped one from it.
+- **`Inventory`** — `add_item`, `remove_item`, `find_first_consumable`.
+  `player.inventory` is a flat `Array[ItemData]`; there is no
+  stacking/count field, so buying the same potion twice just appends
+  the same shared `ConsumableData` resource reference twice (items are
+  treated as immutable templates, never mutated per-copy, so sharing a
+  reference across multiple inventory slots is safe).
+
+New schema: **`ConsumableData extends ItemData`** (`scripts/data/consumable_data.gd`)
+— `heal_hp: int`, `heal_mp: int`.
+
+UI built on this layer (Agent 5):
+- **`InventoryUI`** (`scenes/ui/InventoryUI.tscn`, a child of
+  `Player.tscn`, toggled by the `I` key) — lists equipped gear with
+  Unequip buttons and inventory items with Equip buttons (for
+  `EquipmentData`) or just a description (for `ConsumableData`), plus
+  the player's current effective stats. Present in every map because
+  it lives on `Player`, not on a per-map scene. Equipment *comparison*
+  (before/after preview) is explicitly Phase 4 scope, not built here.
+- **`ShopUI`** (`scenes/ui/ShopUI.tscn`, instanced by `town.gd`, opened
+  by walking into `ShopTrigger`) — a data-driven item list (the
+  `item_ids` the shop sells is set on the instance by `town.gd`, not
+  hardcoded in the script); Buy deducts `item.value` gold and calls
+  `Inventory.add_item`. Both `InventoryUI` and `ShopUI` being open
+  pauses `Player`'s `_physics_process` (`InventoryUI` checks its own
+  `visible` state; `ShopUI`'s open/close is wired by `town.gd` since
+  the shop is Town-only, not a `Player` child).
 
 UI (`scripts/ui/battle_ui.gd` + `scenes/ui/BattleUI.tscn`, Agent 5)
 reads battle state via the signals/fields above and drives the command

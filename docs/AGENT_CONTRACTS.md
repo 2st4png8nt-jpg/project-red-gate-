@@ -102,6 +102,20 @@ Delivered in Phase 2:
   to grant XP and apply level-ups. Deliberately simple; real balancing
   is Phase 3/4 (GAME_DESIGN.md Section 27 — play and measure first).
 
+Delivered in Phase 3:
+- `StatsCalculator`, `EquipmentManager`, `Inventory` (`scripts/rpg/`) —
+  see ARCHITECTURE.md Section 6a for the full interface. `BattleManager`
+  (Agent 2) now calls `StatsCalculator` instead of reading `PlayerData`'s
+  raw stat fields, so equipment bonuses are live in combat immediately.
+- `ConsumableData extends ItemData` schema (`scripts/data/consumable_data.gd`).
+- 4 items of shop content in `data/items/`: Rusted Shortsword,
+  Traveler's Vest, Lucky Charm (all `EquipmentData`, matching the
+  example progression table in GAME_DESIGN.md Section 11 exactly), and
+  the Ember Draught consumable.
+- `BattleManager.player_use_item()` now actually works (was a Phase 2
+  stub that only reported "no items"): uses the first consumable in
+  the inventory, heals it, removes it.
+
 ## AGENT 4 — World / Gate
 
 Owns: `scripts/world/`, `scripts/gates/`, `data/maps/`, `data/gates/`.
@@ -154,6 +168,12 @@ Delivered in Phase 2:
   to `Battle.tscn`, and deliberately leaves `current_map_id` untouched
   so `BattleUI` can return the player to the same map after the fight.
 
+Delivered in Phase 3:
+- `ShopTrigger` (`scripts/world/shop_trigger.gd`) — re-enterable
+  walk-in trigger (unlike `EncounterTrigger`, no one-shot guard: you
+  can browse a shop as many times as you like) opening the Waymark
+  shop, placed in Town.
+
 ## AGENT 5 — UI / UX
 
 Owns: `scripts/ui/`, `scenes/ui/`.
@@ -170,6 +190,15 @@ Delivered in Phase 2:
   `BattleManager` only through its signals and public fields (`enemy`,
   `enemy_hp`, `player`) — never calls into its private `_win()`/`_lose()`
   methods or touches damage math.
+
+Delivered in Phase 3:
+- `InventoryUI` (`scripts/ui/inventory_ui.gd` + `scenes/ui/InventoryUI.tscn`)
+  — equip/unequip screen, a child of `Player.tscn` (present in every
+  map), toggled by the `I` key. Mutates `GameState.player` only through
+  `EquipmentManager`/`Inventory` calls, per ARCHITECTURE.md Section 6a.
+- `ShopUI` (`scripts/ui/shop_ui.gd` + `scenes/ui/ShopUI.tscn`) — buy
+  screen instanced by `town.gd`, reading which items are for sale from
+  an exported `item_ids` list (data, not a hardcoded switch statement).
 
 ## AGENT 6 — Enemy / Content
 
@@ -295,6 +324,10 @@ See Agent 3 section above for the full field list.
 - `enemy_id: String`
 - `can_flee: bool`
 
+### `ConsumableData extends ItemData` (scripts/data/consumable_data.gd) — added Phase 3
+- `heal_hp: int`
+- `heal_mp: int`
+
 ---
 
 ## Open Interface Decisions Log
@@ -306,3 +339,11 @@ re-litigates it (CLAUDE.md Section 19).
   (`"red_gate"`) rather than stored per-combination-row, since there is
   exactly one special destination in the prototype. Revisit only if a
   second special map is added.
+- **2026-09-15** — Decided equipment bonuses are computed on read
+  (`StatsCalculator`) rather than applied by mutating `PlayerData`'s
+  base stats when a piece is equipped/unequipped. Mutate-on-equip would
+  need every future path that changes equipment to remember to reverse
+  the mutation symmetrically (drop-and-replace, unequip-for-a-trade,
+  future loot auto-equip) — a single source of truth for "what does
+  this player currently have equipped" is worth the extra function
+  calls in hot paths like `BattleManager`.
