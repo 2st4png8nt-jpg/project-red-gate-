@@ -230,6 +230,43 @@ resolve -> show result -> repeat until victory/defeat.
 
 Commands: **Attack, Skill, Item, Defend, Run**.
 
+### Damage & initiative (systems-depth pass, post-Phase-5)
+
+Damage no longer subtracts defense flat from power. Every hit runs
+through `CombatMath.mitigate()`: a diminishing-returns curve,
+`mitigation = defense/(defense+40)`, so defense is always worth
+something but can never make a unit unhittable (a raw hit of at least 1
+always lands). Skills scale off Attack if their `element` is
+`"physical"`, or Magic Power for every other element (fire, etc.) — so
+gearing Magic Power now matters for elemental skills the way Attack
+always mattered for weapon damage.
+
+Whoever has the higher effective Speed opens the battle; ties default to
+the player. Speed existed as a stat since Phase 0 but had no gameplay
+effect until now. Only the opening turn is speed-checked — turns
+alternate normally afterward, there's no full speed-queue/ATB system in
+this prototype.
+
+**Balance finding (not a bug):** an undefended level-1 player cannot
+survive the Ashen Warden's opening Ashfall — its raw power exceeds a
+level-1 player's base 20 HP once mitigated. This is a direct, working
+consequence of the new formula and the intended stakes of the Red
+Gate's boss, not something to silently patch around; a player is
+expected to gear up (e.g. Traveler's Vest for +5 HP/+3 Defense) before
+attempting the Red Gate. Noted here per Section 27's "measure then
+adjust" philosophy rather than tuned away.
+
+### Weapon movesets (systems-depth pass, post-Phase-5)
+
+Weapons can grant an extra Skill only usable while that weapon is
+equipped, on top of the 3 universal skills every player always has:
+- **Cinderfall Cleaver** grants **Cleave** (physical, single target)
+- **Cindermourn** grants **Ashbrand** (fire, single target, high power)
+
+This makes gear a build choice beyond raw stat totals — switching
+weapons changes what moves are available, not just the numbers behind
+Basic Attack.
+
 ### Enemies (prototype set)
 - Ember Wisp (common — Cinderfall Woods, and reused at scaled level/stats
   in every generated dungeon; see Section 6's word-driven generation)
@@ -268,16 +305,22 @@ Rarity tiers: **Common, Uncommon, Rare, Unique**.
 Every item has: name, description, rarity, level requirement (optional),
 stat block, optional special effect, value, source.
 
-### Progression, as actually implemented (Phases 3-5)
+`level_requirement` existed on every item since Phase 0 but was
+unenforced until the systems-depth pass — `EquipmentManager.can_equip()`
+now gates the Equip button in the inventory screen, so gear
+progression actually paces with player level instead of being
+available from turn one.
 
-| Item | Rarity | Stats | Source |
-|---|---|---|---|
-| Rusted Shortsword | Common | +6 Attack | Waymark shop |
-| Traveler's Vest | Common | +3 Defense, +5 max HP | Waymark shop |
-| Lucky Charm | Common | +2 Speed | Waymark shop |
-| Cinderfall Cleaver | Uncommon | +14 Attack | Cinderfall Woods / generated-dungeon drop |
-| Ashcinder Guard | Rare | +10 Defense, +10 max HP | Cinder Wraith drop, or a level-4 generated dungeon |
-| **Cindermourn** | **Unique** | +35 Attack, +15% damage vs. the `"ashen"` family, restores 5 MP on kill | Ashen Warden (Red Gate) drop — the only guaranteed unique |
+### Progression, as actually implemented (Phases 3-5, level-gated post-Phase-5)
+
+| Item | Rarity | Req. Lv | Stats | Moveset | Source |
+|---|---|---|---|---|---|
+| Rusted Shortsword | Common | 1 | +6 Attack | — | Waymark shop |
+| Traveler's Vest | Common | 1 | +3 Defense, +5 max HP | — | Waymark shop |
+| Lucky Charm | Common | 1 | +2 Speed | — | Waymark shop |
+| Cinderfall Cleaver | Uncommon | 2 | +14 Attack | Cleave | Cinderfall Woods / generated-dungeon drop |
+| Ashcinder Guard | Rare | 2 | +10 Defense, +10 max HP | — | Cinder Wraith drop, or a level-4 generated dungeon |
+| **Cindermourn** | **Unique** | 3 | +35 Attack, +15% damage vs. the `"ashen"` family, restores 5 MP on kill | Ashbrand | Ashen Warden (Red Gate) drop — the only guaranteed unique |
 
 Cindermourn is deliberately *not* just a bigger number than the Rare
 tier above it. It trades some of the raw Attack a min-maxed build might

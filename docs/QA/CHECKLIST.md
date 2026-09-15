@@ -2,6 +2,45 @@
 
 Owner: Agent 9 (QA)
 
+## Exit criteria for the systems-depth pass (post-Phase-5) — manual, needs a display
+
+Not yet run against this build.
+
+- [ ] Fighting an enemy with 0 Defense hits noticeably harder than the
+      same attack against a Defense-heavy enemy, but even the toughest
+      current enemy always takes at least 1 damage from a hit (never a
+      "0 damage" or "immune" result).
+- [ ] Against the Ashen Warden (speed 6), an unequipped level-1 player
+      sees the enemy act *first* with an opening message before any
+      command menu is enabled; a fast-enough/high-Speed loadout instead
+      lets the player act first.
+- [ ] Fighting the Ashen Warden undefended (no armor equipped) as a
+      fresh level-1 character is lethal from its opening attack — this
+      is the intended, documented balance finding (GAME_DESIGN.md
+      Section 9), not a bug; confirm the defeat flow (message, return
+      to Waymark, HP/MP restored) still works correctly when it happens.
+- [ ] Equipping the Cinderfall Cleaver adds **Cleave** to the Skill
+      submenu; unequipping it removes Cleave from the menu again.
+- [ ] Equipping Cindermourn adds **Ashbrand** to the Skill submenu (in
+      addition to Cleave staying available only while the Cleaver is
+      equipped — the two movesets don't stack or leak into each other).
+- [ ] The 3 universal skills (Ember Slash, Guard Break, Second Wind)
+      remain available regardless of which weapon is equipped, or none.
+- [ ] In the Inventory screen, each item row shows "req. LvN"; the
+      Equip button is visibly disabled for any item above the player's
+      current level.
+- [ ] Attempting to equip a level-gated item anyway (if reachable, e.g.
+      via a stale button state) shows "Requires level N (you are M)."
+      and does not change equipped gear or consume the item.
+- [ ] Leveling up past an item's requirement makes its Equip button
+      become enabled without needing to reopen the Inventory screen
+      from scratch (or at minimum after a close/reopen).
+- [ ] No script errors appear in the console across a full loop:
+      open Inventory, attempt a blocked equip, level up, equip the
+      Cleaver, fight (confirm Cleave is usable), switch to Cindermourn,
+      fight the Ashen Warden (confirm Ashbrand is usable and initiative
+      resolves correctly either direction).
+
 ## Exit criteria for Phase 5 (Gates) — manual, needs a display
 
 Not yet run against this build.

@@ -5,6 +5,18 @@ class_name EquipmentManager
 ## previously-equipped item into/out of `player.inventory` — this
 ## utility only touches the equipped_* slots and clamps hp/mp so a
 ## max_hp/max_mp swing never leaves current hp/mp above the new max.
+##
+## Callers are also responsible for checking can_equip() first: equip()
+## trusts it was already checked and performs the swap unconditionally
+## (same "utility does the mechanical part, caller owns the decision +
+## any resulting inventory bookkeeping" split as the rest of this file).
+## It does NOT return null to mean "rejected" — that would be
+## indistinguishable from "nothing was equipped in that slot before,"
+## and a caller that skipped the check would then wrongly treat a
+## rejected equip as a successful one with no previous item to restore.
+
+static func can_equip(player: PlayerData, item: EquipmentData) -> bool:
+	return player.level >= item.level_requirement
 
 static func equip(player: PlayerData, item: EquipmentData) -> EquipmentData:
 	var previous: EquipmentData = null

@@ -234,16 +234,18 @@ Exposed signals (UI reads state only through these plus the public
   `loot_item_name` is `""` when nothing dropped (see Section 6b);
   `battle_lost`, `battle_fled`
 
-Damage formulas (deliberately simple — see GAME_DESIGN.md Section 27,
-balance from playtesting, not a spreadsheet up front; `attacker.attack`
-etc. below mean the `StatsCalculator` effective value for the player's
-side, and the `EnemyScaler` scaled value — see Section 7a — for the
-enemy's side; `enemy_level` defaults to 1, so hand-authored Phase 2-4
-encounters are completely unaffected by this Phase 5 addition):
-- Basic attack: `max(1, attacker.attack - defender.defense)`, then the
-  weapon family bonus below if it applies
-- Skill (non-self): `max(1, skill.power + attacker.magic_power - defender.defense)`,
+Damage formulas (`attacker.attack` etc. below mean the `StatsCalculator`
+effective value for the player's side, and the `EnemyScaler` scaled
+value — see Section 7a — for the enemy's side; `enemy_level` defaults
+to 1, so hand-authored Phase 2-4 encounters are unaffected by that
+addition. All damage now routes through `CombatMath.mitigate()` — see
+Section 6c — rather than flat subtraction):
+- Basic attack: `CombatMath.mitigate(attacker.attack, defender.defense)`,
   then the weapon family bonus below if it applies
+- Skill (non-self): `CombatMath.mitigate(skill.power + power_stat, defender.defense)`,
+  where `power_stat` is Attack or Magic Power depending on
+  `skill.element` (`CombatMath.skill_power_stat()`, Section 6c), then
+  the weapon family bonus below if it applies
 - Skill (`target_type == "self"`): heals `skill.power` HP, no defense involved
 - Defending halves the next hit taken (integer division), one-shot flag
   cleared after it's used once
@@ -362,6 +364,62 @@ rather than a per-stat match statement — see `_format_comparison()` in
 `scripts/ui/inventory_ui.gd`. It duplicates none of `StatsCalculator`'s
 logic; it only diffs one candidate item against whatever already
 occupies that slot.
+
+## 6c. Combat Stat System Logic (systems-depth pass, post-Phase-5)
+
+Requested directly by the project owner: gear should carry stats, stats
+should drive abilities, and both should route through a logic-based
+system rather than ad hoc arithmetic. Four changes, all in
+`scripts/combat/`:
+
+**`CombatMath`** (`scripts/combat/combat_math.gd`, static) replaces the
+flat `power - defense` subtraction everywhere it was used:
+
+- `mitigate(raw_power, defense) -> int` — a diminishing-returns curve,
+  `damage = max(1, round(raw_power * (1 - defense/(defense + 40))))`.
+  Flat subtraction has a cliff: once defense >= power every hit floors
+  to 1 and stacking more defense past that point does nothing, while
+  below it defense does nothing until it crosses the threshold. The
+  percentage curve makes every point of defense worth something
+  without ever fully negating an attack. `40` (`MITIGATION_K`) is the
+  defense value that yields exactly 50% mitigation; tune this constant
+  first if damage numbers feel off, per GAME_DESIGN.md Section 27
+  (measure from play, don't pre-balance from a spreadsheet).
+- `skill_power_stat(skill, attack_stat, magic_power_stat) -> int` —
+  physical-element skills scale off Attack, everything else off Magic
+  Power. Before this, `SkillData.element` was purely descriptive text;
+  a skill flagged `"physical"` (Guard Break, Thorn Whip) was silently
+  scaling off Magic Power like every other skill. `BattleManager` calls
+  this for both the player's and the enemy's non-self skill damage.
+
+**Initiative**: `_start_with_encounter()` now compares `enemy.speed`
+(intentionally unscaled — see `EnemyScaler`'s doc comment) against
+`StatsCalculator.effective_speed(player)` and lets the faster side act
+first; turns alternate normally after that opening move. Previously the
+player always acted first regardless of Speed, which made the stat (and
+the Lucky Charm accessory that boosts it) purely decorative — Speed was
+tracked and displayed everywhere but read nowhere in `BattleManager`.
+
+**Weapon movesets**: new `EquipmentData.granted_skill_id: String` — a
+weapon can grant one extra `SkillData` id, available in the Skill
+submenu only while it's equipped, alongside the 3 universal skills
+every player always has. `BattleUI._ready()` builds its skill button
+list as `UNIVERSAL_SKILL_IDS + [equipped weapon's granted_skill_id, if
+any]`. Cinderfall Cleaver grants Cleave (physical); Cindermourn grants
+Ashbrand (ember — deliberately scales off Magic Power despite
+Cindermourn itself only boosting Attack, giving a reason to invest in
+Magic Power even on an Attack-focused unique-weapon build).
+
+**Gear level-gating**: `EquipmentData.level_requirement` existed since
+Phase 0 but nothing ever read it. `EquipmentManager.can_equip(player, item) -> bool`
+now checks `player.level >= item.level_requirement`; `equip()` itself
+still performs the swap unconditionally and does *not* self-check —
+see the doc comment on why (a rejected equip can't be signaled through
+the same "returns the previous item, or null" contract without a
+caller that skipped the check misinterpreting a rejection as "nothing
+was equipped before," and then wrongly discarding the item from
+inventory). `InventoryUI` is the one caller today; it disables the
+Equip button and shows a message when the check fails.
 
 ## 7. Gate Resolution Contract (Phase 5 — implemented)
 

@@ -57,13 +57,25 @@ func _start_with_encounter(encounter: EncounterData) -> void:
 	player = GameState.player
 	enemy_hp = EnemyScaler.max_hp(enemy, enemy_level)
 	player_defending = false
-	state = State.PLAYER_INPUT
-	turn_state_changed.emit("player_input")
+
+	# Initiative: whoever is faster acts first; turns alternate normally
+	# after that. Speed was previously decorative (turn order was
+	# always player-first regardless of it) — see ARCHITECTURE.md
+	# Section 6c. Enemy speed is deliberately unscaled by EnemyScaler.
+	if enemy.speed > StatsCalculator.effective_speed(player):
+		state = State.RESOLVING
+		turn_state_changed.emit("resolving")
+		action_resolved.emit("%s is faster and strikes first!" % enemy.display_name)
+		await get_tree().create_timer(0.6).timeout
+		_enemy_turn()
+	else:
+		state = State.PLAYER_INPUT
+		turn_state_changed.emit("player_input")
 
 func player_attack() -> void:
 	if state != State.PLAYER_INPUT:
 		return
-	var dmg := maxi(1, StatsCalculator.effective_attack(player) - EnemyScaler.defense(enemy, enemy_level))
+	var dmg := CombatMath.mitigate(StatsCalculator.effective_attack(player), EnemyScaler.defense(enemy, enemy_level))
 	dmg = _apply_weapon_family_bonus(dmg)
 	enemy_hp = maxi(0, enemy_hp - dmg)
 	action_resolved.emit("You attack for %d damage." % dmg)
@@ -81,7 +93,10 @@ func player_use_skill(skill: SkillData) -> void:
 		player.hp = mini(StatsCalculator.effective_max_hp(player), player.hp + healed)
 		action_resolved.emit("You use %s and recover %d HP." % [skill.display_name, healed])
 	else:
-		var dmg := maxi(1, skill.power + StatsCalculator.effective_magic_power(player) - EnemyScaler.defense(enemy, enemy_level))
+		var power_stat := CombatMath.skill_power_stat(
+			skill, StatsCalculator.effective_attack(player), StatsCalculator.effective_magic_power(player)
+		)
+		var dmg := CombatMath.mitigate(skill.power + power_stat, EnemyScaler.defense(enemy, enemy_level))
 		dmg = _apply_weapon_family_bonus(dmg)
 		enemy_hp = maxi(0, enemy_hp - dmg)
 		action_resolved.emit("You use %s for %d damage." % [skill.display_name, dmg])
@@ -147,10 +162,13 @@ func _enemy_turn() -> void:
 	var player_defense := StatsCalculator.effective_defense(player)
 	if enemy.skill_ids.size() > 0:
 		var skill: SkillData = DataLoader.load_resource("res://data/skills/%s.tres" % enemy.skill_ids[0])
-		dmg = maxi(1, skill.power + EnemyScaler.magic_power(enemy, enemy_level) - player_defense)
+		var power_stat := CombatMath.skill_power_stat(
+			skill, EnemyScaler.attack(enemy, enemy_level), EnemyScaler.magic_power(enemy, enemy_level)
+		)
+		dmg = CombatMath.mitigate(skill.power + power_stat, player_defense)
 		msg = "%s uses %s for %d damage!" % [enemy.display_name, skill.display_name, dmg]
 	else:
-		dmg = maxi(1, EnemyScaler.attack(enemy, enemy_level) - player_defense)
+		dmg = CombatMath.mitigate(EnemyScaler.attack(enemy, enemy_level), player_defense)
 		msg = "%s attacks for %d damage!" % [enemy.display_name, dmg]
 
 	if player_defending:

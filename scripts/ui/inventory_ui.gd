@@ -15,6 +15,7 @@ const COMPARISON_FIELDS := [
 @onready var stats_label: Label = $Root/StatsLabel
 @onready var equipped_list: VBoxContainer = $Root/EquippedList
 @onready var items_list: VBoxContainer = $Root/ItemsList
+@onready var message_label: Label = $Root/MessageLabel
 @onready var close_button: Button = $Root/CloseButton
 
 func _ready() -> void:
@@ -23,6 +24,7 @@ func _ready() -> void:
 
 func _on_visibility_changed() -> void:
 	if visible:
+		message_label.text = ""
 		refresh()
 
 func refresh() -> void:
@@ -62,7 +64,9 @@ func _add_item_row(item: ItemData) -> void:
 	var row := HBoxContainer.new()
 	var text := Label.new()
 	if item is EquipmentData:
-		text.text = "%s (%s %s) — %s" % [item.display_name, item.rarity, item.slot, _format_comparison(item)]
+		text.text = "%s (%s %s, req. Lv%d) — %s" % [
+			item.display_name, item.rarity, item.slot, item.level_requirement, _format_comparison(item)
+		]
 	elif item is ConsumableData:
 		text.text = "%s (heals %d HP, %d MP)" % [item.display_name, item.heal_hp, item.heal_mp]
 	else:
@@ -71,6 +75,7 @@ func _add_item_row(item: ItemData) -> void:
 	if item is EquipmentData:
 		var btn := Button.new()
 		btn.text = "Equip"
+		btn.disabled = not EquipmentManager.can_equip(GameState.player, item)
 		btn.pressed.connect(_on_equip_pressed.bind(item))
 		row.add_child(btn)
 	items_list.add_child(row)
@@ -102,10 +107,17 @@ func _format_comparison(item: EquipmentData) -> String:
 	return "vs. equipped: " + ", ".join(deltas)
 
 func _on_equip_pressed(item: EquipmentData) -> void:
+	# The Equip button is already disabled when this would fail (see
+	# _add_item_row), but check again here rather than trust that alone
+	# — cheap, and avoids ever silently eating an item on a stale button.
+	if not EquipmentManager.can_equip(GameState.player, item):
+		message_label.text = "Requires level %d (you are %d)." % [item.level_requirement, GameState.player.level]
+		return
 	var previous := EquipmentManager.equip(GameState.player, item)
 	Inventory.remove_item(GameState.player, item)
 	if previous != null:
 		Inventory.add_item(GameState.player, previous)
+	message_label.text = ""
 	refresh()
 
 func _on_unequip_pressed(slot: String) -> void:

@@ -7,6 +7,119 @@ Section 28).
 
 ---
 
+## 2026-09-15 — Systems-depth pass: stats, abilities, movesets (post-Phase-5)
+
+STATUS: COMPLETE
+
+The project owner asked, after seeing Phase 5's screenshot, to deepen
+combat/progression beyond the vertical slice: gear should meaningfully
+grant stats, abilities should be driven by the right stats, weapons
+should have their own movesets, and the whole thing should run on a
+"logic based" stat system rather than ad hoc numbers — tied together
+with leveling. Not a new phase per CLAUDE.md's roadmap; a depth pass
+across systems already built in Phases 2-5.
+
+IMPLEMENTED:
+- `CombatMath` (`scripts/combat/combat_math.gd`, new): centralizes
+  damage math for `BattleManager`. `mitigate(raw_power, defense)` uses
+  a diminishing-returns curve (`defense/(defense+40)`) instead of flat
+  `power - defense` subtraction — defense is always worth something,
+  never makes a unit unhittable (floor of 1 damage).
+  `skill_power_stat()` picks Attack for `element == "physical"` skills,
+  Magic Power for everything else, so elemental skills finally scale
+  off the stat their fiction implies.
+- Speed-based initiative in `BattleManager._start_with_encounter()`:
+  whichever side has higher effective Speed opens the battle; ties
+  default to the player. Speed existed since Phase 0 but was purely
+  decorative until now. Only the opening turn is speed-checked; turns
+  alternate normally afterward.
+- Weapon movesets: `EquipmentData.granted_skill_id` (new field) names
+  an extra `SkillData` only offered in `BattleUI`'s Skill submenu while
+  that weapon is equipped. Authored two: Cinderfall Cleaver grants
+  **Cleave** (`data/skills/cleaver_cleave.tres`), Cindermourn grants
+  **Ashbrand** (`data/skills/cindermourn_ashbrand.tres`).
+- `EquipmentManager.can_equip()` (new): enforces the
+  `level_requirement` field every item has had since Phase 0 but which
+  was never checked. `InventoryUI` disables the Equip button and shows
+  a rejection message for gear above the player's level. Assigned real
+  `level_requirement` values across the item set (starter gear at 1,
+  Cinderfall Woods drops at 2, Red Gate drops at 3) — every item had
+  shipped with the Phase 0 placeholder of `0`.
+
+FILES CHANGED:
+- New: `scripts/combat/combat_math.gd`,
+  `data/skills/cleaver_cleave.tres`, `data/skills/cindermourn_ashbrand.tres`.
+- Modified: `scripts/combat/battle_manager.gd` (mitigation, initiative,
+  element-aware skill scaling), `scripts/data/equipment_data.gd`
+  (`granted_skill_id`), `scripts/rpg/equipment_manager.gd`
+  (`can_equip`), `scripts/ui/battle_ui.gd` (moveset consumption),
+  `scripts/ui/inventory_ui.gd` + `scenes/ui/InventoryUI.tscn`
+  (level-gating UI + message label), `data/items/*.tres` (level
+  requirements, `granted_skill_id` on the two weapons above).
+
+INTERFACES CHANGED:
+- `EquipmentData` gained `granted_skill_id: String` (empty = grants
+  nothing).
+- `EquipmentManager` gained `can_equip(player, item) -> bool`. `equip()`
+  itself is unchanged and still does not self-check — see
+  AGENT_CONTRACTS.md's Open Interface Decisions Log for why.
+- `BattleManager` damage paths (`player_attack`, `player_use_skill`,
+  `_enemy_turn`) now route through `CombatMath` instead of inline flat
+  subtraction. No public signature changed, only internal math.
+
+TESTS:
+- Headless self-tests (temporary code in `boot.gd`, reverted after,
+  confirmed via `git diff --stat` showing no changes) with exact-number
+  verification, not just "does it run":
+  - `CombatMath.mitigate(40, 6)` hand-checked against the live
+    Cindermourn-vs-Ashen-Warden basic attack: expected
+    `round(40*(1-6/46))=35`, then the existing weapon-family bonus
+    `round(35*1.15)=40`; battle showed `enemy_hp 70 -> 30`, exact match.
+  - Initiative: confirmed the Ashen Warden (speed 6) correctly acts
+    first against a level-1 player (effective speed 5, even with
+    Cindermourn equipped, since it grants no speed bonus) — the test
+    had to wait out the enemy's opening turn before attempting a player
+    action, which was the correct new behavior, not a bug.
+  - Level-gating: confirmed `can_equip()` rejects a level-3 item for a
+    level-1 player and `InventoryUI` shows the rejection message.
+- One real bug found and fixed during this pass: `battle_ui.gd`'s
+  `var weapon := battle_manager.player.equipped_weapon` failed to
+  parse ("Cannot infer the type of 'weapon' variable") because
+  `battle_manager` is `Node`-typed via `get_parent()`, making the
+  access chain dynamically typed. Fixed with an explicit
+  `var weapon: EquipmentData = ...` annotation — same class of error
+  hit in earlier phases with untyped access through generically-typed
+  nodes.
+
+KNOWN ISSUES:
+- **Balance finding, not a bug**: an undefended level-1 player cannot
+  survive the Ashen Warden's opening Ashfall under the new mitigation
+  formula — its raw power exceeds the player's base 20 HP once
+  mitigated. Confirmed intentional/working-as-designed via a follow-up
+  test with a Traveler's Vest equipped (survives with 1 HP). Documented
+  in GAME_DESIGN.md Section 9 rather than silently tuned away, per
+  CLAUDE.md Section 27's "measure then adjust" philosophy — the Red
+  Gate is meant to require gearing up first.
+- Only the opening turn is speed-checked; there is no full ATB/speed
+  queue across a multi-turn battle. Acceptable for this prototype's
+  scope.
+- As with every prior phase, only headless logic validation and
+  self-tests were possible in this sandbox — no interactive play.
+  Opening the project in the Godot 4.3 editor to feel the new combat
+  pacing (does mitigation feel too spongy/too swingy, does initiative
+  read clearly in the UI) is a required follow-up before calling combat
+  feel "done" in the fullest sense.
+
+FOLLOW-UP:
+- If a human playtest finds the mitigation curve too spongy or too
+  swingy, `CombatMath.MITIGATION_K` is the single tuning knob.
+- Consider a small UI cue for who won initiative (currently only
+  inferable from the message log).
+- No further systems work is planned unless requested — this was an
+  explicit scope-widening ask, not part of the phased roadmap.
+
+---
+
 ## 2026-09-15 — Phase 5: Gates established
 
 STATUS: COMPLETE

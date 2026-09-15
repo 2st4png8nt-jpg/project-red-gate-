@@ -17,3 +17,9 @@ class_name EquipmentData
 @export var bonus_damage_vs_family: String = "" # matches EnemyData.family; empty = no bonus
 @export var bonus_damage_percent: float = 0.0 # e.g. 0.15 = +15% damage vs. that family
 @export var mp_restore_on_kill: int = 0
+# A weapon's "moveset" — an extra SkillData id only available in the
+# Skill submenu while this piece is equipped, on top of the 3 universal
+# skills every player always has. Empty = grants nothing (armor and
+# accessories are never expected to set this, though the field isn't
+# restricted to weapon-slot items).
+@export var granted_skill_id: String = ""

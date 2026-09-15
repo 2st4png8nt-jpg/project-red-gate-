@@ -103,6 +103,21 @@ Delivered in Phase 5:
 - `EncounterData` gained `level: int` and `loot_table_id_override: String`
   (both additive/backward-compatible — see AGENT_CONTRACTS.md schema list).
 
+Delivered in the post-Phase-5 systems-depth pass (requested directly by
+the project owner: gear/stats/abilities/leveling needed to interlock
+through real logic, not flat arithmetic):
+- `CombatMath` (`scripts/combat/combat_math.gd`, static) — the
+  diminishing-returns `mitigate()` formula and element-aware
+  `skill_power_stat()`, replacing flat `power - defense` subtraction
+  and the previously-decorative `SkillData.element` field. See
+  ARCHITECTURE.md Section 6c for the full reasoning.
+- Speed-based initiative in `_start_with_encounter()` — Speed was
+  tracked and displayed everywhere but read nowhere in combat before
+  this; now the faster side acts first.
+- Weapon movesets consumed via `player.equipped_weapon.granted_skill_id`
+  (Agent 3 schema) — see Agent 5's `BattleUI` delivery below for where
+  it's actually read.
+
 ## AGENT 3 — RPG / Gear
 
 Owns: `scripts/rpg/`, `data/items/`, `data/characters/`.
@@ -151,6 +166,20 @@ Delivered in Phase 5:
   fields. Content-wise this sits in Agent 3's `data/items/`, same as
   every other equipment piece, even though it's exclusively awarded
   through Agent 6's Ashen Warden loot table.
+
+Delivered in the post-Phase-5 systems-depth pass:
+- `EquipmentData.granted_skill_id: String` — a weapon's "moveset," an
+  extra `SkillData` id from Agent 2's `data/skills/` available only
+  while that piece is equipped. Set on Cinderfall Cleaver (Cleave) and
+  Cindermourn (Ashbrand).
+- `EquipmentManager.can_equip(player, item) -> bool` — enforces
+  `EquipmentData.level_requirement`, which existed since Phase 0 but
+  was never read by anything until now.
+- Real `level_requirement` values assigned to every equipment item:
+  1 for the Common shop stock (no practical gate at a level-1 start),
+  2 for the Uncommon/Rare Cinderfall Woods drops, 3 for Cindermourn —
+  see GAME_DESIGN.md's progression table and the note on what that
+  means for a player who rushes the Red Gate early.
 
 ## AGENT 4 — World / Gate
 
@@ -281,6 +310,18 @@ Delivered in Phase 5:
   opened by the new `GateTrigger`, replacing the old direct-to-Cinderfall-
   Woods doorway.
 
+Delivered in the post-Phase-5 systems-depth pass:
+- `BattleUI`'s skill submenu now builds its button list as
+  `UNIVERSAL_SKILL_IDS + [equipped weapon's granted_skill_id, if any]`
+  instead of a fixed 3-skill list — the "movesets" half of Agent 2's
+  weapon-moveset delivery.
+- `InventoryUI` gained a `MessageLabel`, checks
+  `EquipmentManager.can_equip()` before equipping (disabling the Equip
+  button and showing a rejection message when the check fails, rather
+  than letting a stale click silently do nothing or — the bug this
+  specifically avoids — remove an item from inventory that was never
+  actually equipped), and item rows now show their `level_requirement`.
+
 ## AGENT 6 — Enemy / Content
 
 Owns: `data/enemies/`, `data/encounters/`, `data/loot/`, `scripts/enemies/`.
@@ -394,6 +435,10 @@ ARCHITECTURE.md Section 8 save-data notes if it affects save data).
 - `bonus_damage_vs_family: String` — added Phase 5; matches `EnemyData.family`, empty = no bonus
 - `bonus_damage_percent: float` — added Phase 5; e.g. `0.15` = +15% damage vs. that family
 - `mp_restore_on_kill: int` — added Phase 5
+- `granted_skill_id: String` — added post-Phase-5 systems-depth pass; a
+  weapon's "moveset" — the id of an extra `SkillData` only offered in
+  BattleUI's Skill submenu while this item is equipped, on top of the 3
+  universal skills every player always has; empty = grants nothing
 
 ### `SkillData` (scripts/data/skill_data.gd)
 - `id: String`
@@ -526,3 +571,43 @@ re-litigates it (CLAUDE.md Section 19).
   Tone/Sign combinations would blow well past that for content that's
   mostly reused stat blocks anyway. Revisit only after the vertical
   slice is proven fun and more content is explicitly in scope.
+- **2026-09-15 (post-Phase-5 systems-depth pass)** — Decided damage
+  mitigation uses a diminishing-returns percentage curve
+  (`defense/(defense+K)`, `K=40`) instead of flat `power - defense`
+  subtraction, centralized in the new `CombatMath.mitigate()`. Flat
+  subtraction lets defense trivially zero out weak attacks and scales
+  linearly forever with no natural cap; the percentage curve keeps every
+  point of defense valuable at any gear tier without ever making a unit
+  unhittable, and gives a single formula both `BattleManager` and future
+  systems (e.g. status effects, enemy abilities) can call instead of
+  re-deriving damage math ad hoc.
+- **2026-09-15 (post-Phase-5 systems-depth pass)** — Decided combat
+  initiative is speed-based (whoever has higher effective Speed acts
+  first; ties keep the player-first default) instead of always
+  player-first. Speed was an exported/scaled stat on both `PlayerData`
+  and `EnemyData` since Phase 0/Phase 3 but had no gameplay effect —
+  purely decorative stats erode the "logic based stat system" the
+  project owner asked for. Only the *opening* turn is speed-checked;
+  turns still alternate normally afterward rather than re-rolling
+  initiative every round, since a full ATB/speed-queue system is out of
+  scope for this prototype.
+- **2026-09-15 (post-Phase-5 systems-depth pass)** — Decided weapon
+  "movesets" are a single optional `granted_skill_id` field on
+  `EquipmentData` (BattleUI adds it to the Skill submenu only while that
+  weapon is equipped) rather than a full per-weapon skill list or a
+  separate moveset resource type. Every current weapon needs at most one
+  signature move on top of the 3 universal skills; a single field is the
+  minimum structure that satisfies "movesets" without speculative
+  generality for multi-skill weapons that don't exist yet.
+- **2026-09-15 (post-Phase-5 systems-depth pass)** — Decided
+  `EquipmentData.level_requirement` (present since Phase 0 but never
+  enforced) is checked via a new `EquipmentManager.can_equip()` query
+  function, called by the UI before showing/allowing Equip, rather than
+  having `EquipmentManager.equip()` itself reject and return a sentinel.
+  `equip()`'s return value (the previously-equipped item, or `null`)
+  already means "nothing was equipped in that slot before" — overloading
+  `null` to also mean "rejected" would make the two cases
+  indistinguishable to callers. Also assigned real `level_requirement`
+  values across the existing item set (starter gear at 1, Cinderfall
+  Woods drops at 2, Red Gate drops at 3) since every item had shipped
+  with the Phase 0 placeholder of `0`.

@@ -4,7 +4,7 @@ extends CanvasLayer
 # player_*() methods. Contains no combat math (Agent 2 owns that) — see
 # ARCHITECTURE.md Section 6 / AGENT_CONTRACTS.md.
 
-const SKILL_IDS := ["ember_slash", "guard_break", "second_wind"]
+const UNIVERSAL_SKILL_IDS := ["ember_slash", "guard_break", "second_wind"]
 
 @onready var battle_manager: Node = get_parent()
 @onready var enemy_name_label: Label = $Root/EnemyPanel/EnemyName
@@ -22,7 +22,11 @@ const SKILL_IDS := ["ember_slash", "guard_break", "second_wind"]
 @onready var skill_back_button: Button = $Root/SkillMenu/BackButton
 
 func _ready() -> void:
-	for id in SKILL_IDS:
+	var skill_ids := UNIVERSAL_SKILL_IDS.duplicate()
+	var weapon: EquipmentData = battle_manager.player.equipped_weapon
+	if weapon != null and weapon.granted_skill_id != "" and not skill_ids.has(weapon.granted_skill_id):
+		skill_ids.append(weapon.granted_skill_id)
+	for id in skill_ids:
 		var skill: SkillData = DataLoader.load_resource("res://data/skills/%s.tres" % id)
 		if skill == null:
 			continue
