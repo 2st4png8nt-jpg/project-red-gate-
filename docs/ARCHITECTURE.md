@@ -87,7 +87,17 @@ Registered in `project.godot` under `[autoload]`, load order matters:
 2. **DataLoader** (`scripts/core/DataLoader.gd`) — loads and caches
    `.tres` Resources from `/data/**` by id. Every other system asks
    DataLoader for content; nothing does a raw `load()` on a data file
-   outside this autoload.
+   outside this autoload. `load_all_in_dir()` (used to enumerate an
+   entire content folder — Gate keywords/combinations) strips a
+   trailing `.remap` before checking for a `.tres` extension: exported
+   builds convert `.tres` resources to binary and leave a
+   `<name>.tres.remap` pointer at the original path, which a raw
+   `DirAccess` directory listing sees literally — this made the Gate
+   system's word pool silently empty in every exported build (dropdowns
+   with nothing in them) while working fine in the editor and in
+   headless runs against the uncompiled project, since both of those
+   read the real `.tres` files directly. Found via an actual exported
+   build, not headless testing — see PROGRESS.md.
 3. **GameState** (`scripts/core/GameState.gd`) — holds the current
    `PlayerData` instance, current map id, and run-level flags (which
    Gate combinations are known/unlocked, which clues are found). This

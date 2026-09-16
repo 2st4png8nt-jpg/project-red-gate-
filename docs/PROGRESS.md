@@ -7,6 +7,87 @@ Section 28).
 
 ---
 
+## 2026-09-16 — Bug fix: Gate system was completely broken in exported builds
+
+STATUS: COMPLETE
+
+Found via the project owner's first real playtest of an actual exported
+build (a standalone Windows .exe) — exactly the category of bug this
+project's docs have repeatedly flagged as unverifiable in this sandbox
+(headless runs and the editor both read the uncompiled `.tres` files
+directly, so this was invisible to every self-test in every prior
+phase). Reported symptom: the Gate word dropdowns showed nothing to
+select.
+
+ROOT CAUSE: `DataLoader.load_all_in_dir()` (used to enumerate an entire
+content folder — Gate keywords and Gate combinations, both scanned by
+`GateUI` and `GateResolver`) filtered directory entries with
+`file_name.ends_with(".tres")`. Godot's export process converts `.tres`
+resources to binary and leaves a `<name>.tres.remap` pointer file at
+the original path; a raw `DirAccess` directory listing sees that
+literal `.tres.remap` name, which never matches `.ends_with(".tres")`.
+The result: `load_all_in_dir()` silently returned an empty array in
+every exported build, for every directory it was asked to scan — not
+just empty dropdowns, but `GateResolver._is_valid_word()` (which uses
+the same call) always returning false, so even a hand-typed valid word
+would have resolved as `INVALID`. Every other content type (enemies,
+skills, items, loot tables, maps) loads via direct `load_resource()`
+calls with a known constructed path, which Godot's loader resolves
+correctly regardless of export — so this bug was scoped exactly to the
+3 `load_all_in_dir()` call sites, all Gate-system directory scans.
+
+FIX: `load_all_in_dir()` now strips a trailing `.remap` before checking
+the `.tres` extension, then loads via the original (un-remapped) path —
+`load()`/`ResourceLoader.load()` already follows the remap transparently
+when given that canonical path. See ARCHITECTURE.md Section 3.
+
+FILES CHANGED: `scripts/core/data_loader.gd` (the fix),
+`docs/ARCHITECTURE.md` (documented the gotcha so a future
+directory-scanning helper doesn't reintroduce it).
+
+TESTS:
+- Reproduced first, not just fixed blind: exported a temporary Linux
+  build (this sandbox can run Linux binaries directly, unlike Windows)
+  with a debug script printing the raw `DirAccess` listing of
+  `data/gates/keywords/` — confirmed every entry showed as
+  `<word>.tres.remap`, and `load_all_in_dir()` returned 0 resources
+  against that same exported binary, before writing any fix.
+- Applied the fix, re-exported the same Linux debug build, and
+  confirmed `load_all_in_dir()` now returns all 16 keywords.
+- Extended the check to `GateResolver.resolve()` directly against the
+  exported binary: a known combo (`Cinder+Broken+Ember`) resolves
+  `KNOWN`, the special combo (`Hollow+Undying+Ember`) resolves
+  `SPECIAL`, a well-formed unlisted combo (`Verdant+Silent+Gale`)
+  resolves `GENERATED` with the correct level, and a nonsense word
+  resolves `INVALID` — all four paths verified against the actual
+  exported artifact, not just headless logic.
+- Re-ran the standard headless smoke test against the uncompiled
+  project (unaffected either way, since the editor/headless path never
+  saw `.remap` files) to confirm nothing else regressed.
+- Re-exported the real Windows build with the fix and re-delivered it.
+
+KNOWN ISSUES:
+- This was the first bug in the whole project caught by an actual
+  exported build rather than headless validation or the editor — a
+  strong signal that other exported-build-only issues could exist
+  undetected. Nothing else is currently suspected, but nothing else has
+  been exported-and-clicked through by a human yet either.
+- Still unverified: how the Gate UI dropdowns actually *feel* to use
+  (click responsiveness, popup positioning at different window sizes) —
+  this fix makes them populate correctly, not necessarily pleasant to
+  use; that needs the project owner's next playtest pass.
+
+FOLLOW-UP:
+- If more directory-scanning gotchas turn up, consider replacing
+  `load_all_in_dir()`'s raw `DirAccess` scan with an explicit manifest
+  resource per content folder (a small `Array[String]` of ids) rather
+  than trusting filesystem listing to behave identically in the editor,
+  headless, and every export target. Not done now since the `.remap`
+  strip fixes the actually-observed failure with a 1-line change;
+  revisit only if a second, different export-only bug surfaces.
+
+---
+
 ## 2026-09-16 — Content-expansion pass: more enemies, gear, Gate words (post-Phase-6)
 
 STATUS: COMPLETE

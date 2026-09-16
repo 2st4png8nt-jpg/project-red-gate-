@@ -24,8 +24,21 @@ func load_all_in_dir(dir_path: String) -> Array[Resource]:
 	dir.list_dir_begin()
 	var file_name := dir.get_next()
 	while file_name != "":
-		if file_name.ends_with(".tres"):
-			var res := load_resource(dir_path.path_join(file_name))
+		# Exported builds convert .tres resources to binary and leave a
+		# ".tres.remap" pointer file at the original path instead — a
+		# raw DirAccess listing sees that remap file, not the original
+		# ".tres" name, so this bug is invisible in the editor and in
+		# headless runs against the uncompiled project (both read the
+		# real .tres files directly) and only surfaces in an exported
+		# build. Strip a trailing ".remap" before checking the
+		# extension, then load via the original (un-remapped) path —
+		# load()/ResourceLoader.load() already follows the remap
+		# transparently when given that canonical path.
+		var resource_name := file_name
+		if resource_name.ends_with(".remap"):
+			resource_name = resource_name.substr(0, resource_name.length() - len(".remap"))
+		if resource_name.ends_with(".tres"):
+			var res := load_resource(dir_path.path_join(resource_name))
 			if res != null:
 				results.append(res)
 		file_name = dir.get_next()
