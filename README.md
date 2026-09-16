@@ -8,8 +8,9 @@ Not an MMO. No accounts, no live service, no persistent online world.
 
 ## Status
 
-Phase 6 (Boss + Polish) complete — the last CLAUDE.md-defined phase.
-See `docs/PROGRESS.md`.
+Phase 6 (Boss + Polish) complete, plus a post-Phase-6 content-expansion
+pass (more Gate words, enemies, and gear within existing systems). See
+`docs/PROGRESS.md`.
 
 ## Controls
 
@@ -46,9 +47,12 @@ somewhere:
   red/black destination guarding the Ashen Warden (also unfleeable)
   and its guaranteed drop, the unique weapon **Cindermourn**.
 - Any other well-formed combination generates a dungeon on the spot:
-  the **Origin** word picks its visual theme, the **Tone** word picks
-  its enemy level (1-4, scaling difficulty and rewards), and the
-  **Sign** word picks how large/branching it is (0-3 side paths).
+  the **Origin** word picks its visual theme (6 now — including the
+  new Frost and Storm — and Verdant/Drowned each spawn their own
+  themed enemy, Thornling/Brinewisp), the **Tone** word picks its enemy
+  level (1-5, scaling difficulty and rewards — Ancient is the new
+  hardest tier), and the **Sign** word picks how large/branching it is
+  (0-3 side paths).
 
 The gold marker in Waymark opens the shop — spend battle gold on a
 weapon, armor, an accessory, or a healing draught. Press `I` anywhere
@@ -57,7 +61,10 @@ changes your stats immediately, including in the very next fight, and
 each item shows how it compares to whatever you currently have
 equipped, plus its level requirement — gear above your level shows as
 locked until you outlevel it. Enemies can also drop gear directly, with
-better odds at tougher dungeons' loot tiers.
+better odds at tougher dungeons' loot tiers — 5 new items (Windward
+Ring, Verdant Fang, Iron Buckler, Brinewoven Robe, Stormcaller Pendant)
+join the original set, including the first gear that raises Magic
+Power at all.
 
 Combat now runs on a real stat system: damage uses a diminishing-returns
 mitigation curve (defense always helps, never makes you unhittable),

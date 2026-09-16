@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EquipmentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/equipment_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "windward_ring"
+display_name = "Windward Ring"
+description = "A thin band that hums faintly when you move quickly."
+rarity = "uncommon"
+level_requirement = 1
+value = 30
+source = "Generated dungeon drop"
+slot = "accessory"
+speed_bonus = 4
+max_mp_bonus = 5

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "thornling"
+display_name = "Thornling"
+family = "verdant"
+max_hp = 22
+attack = 5
+defense = 5
+magic_power = 0
+speed = 2
+xp_reward = 9
+gold_reward = 4
+skill_ids = Array[String](["thornling_bramble_lash"])
+loot_table_id = "generated_mid_loot"
+gate_clue_id = ""

@@ -2,6 +2,49 @@
 
 Owner: Agent 9 (QA)
 
+## Exit criteria for the content-expansion pass (post-Phase-6) — manual, needs a display
+
+Not yet run against this build.
+
+- [ ] The Gate UI's Origin/Tone/Sign dropdowns each list 6/5/5 words
+      respectively (Frost and Storm added to Origin; Ancient to Tone;
+      Fracture to Sign), all still alphabetized/ordered consistently
+      with the rest of the list.
+- [ ] `Frost + <any Tone> + <any Sign>` and `Storm + <any Tone> + <any
+      Sign>` each generate a dungeon with a visibly distinct new floor
+      color, different from all 4 original Origin themes.
+- [ ] `<any Origin> + Ancient + <any Sign>` generates a level-5 dungeon
+      (title bar reads "Level 5") with visibly tougher enemies than an
+      Undying (level 4) dungeon, and its loot feels like the high tier
+      (same drops as level 4, not a new never-before-seen tier).
+- [ ] `<any Origin> + <any Tone> + Fracture` generates a dungeon exactly
+      as large/branching as an Umbra dungeon of the same Tone — not a
+      new distinct layout.
+- [ ] Entering a Verdant-origin generated dungeon and fighting its
+      common-enemy encounters sometimes shows **Thornling** (not just
+      Bramble Husk); a Drowned-origin dungeon sometimes shows
+      **Brinewisp** (not just Ember Wisp). Cinder/Hollow/Frost/Storm
+      dungeons still only ever show Ember Wisp/Bramble Husk.
+- [ ] Fighting a Brinewisp and letting it use its skill (Undertow)
+      shows meaningfully different damage than its basic attack, and
+      that damage responds to the player's Defense the same way every
+      other skill does.
+- [ ] Over several loot rolls in mid-tier (level 3) and low-tier
+      (level 1-2) generated dungeons, each of the 5 new items
+      (Windward Ring, Verdant Fang, Iron Buckler, Brinewoven Robe) and
+      the level-4-exclusive Stormcaller Pendant eventually appears —
+      none of them are unreachable dead content.
+- [ ] Equipping Verdant Fang adds **Piercing Thorn** to the Skill
+      submenu, exactly like Cinderfall Cleaver adds Cleave; unequipping
+      it removes the option again.
+- [ ] Equipping Brinewoven Robe or Stormcaller Pendant visibly raises
+      the Magic Power stat shown in the Inventory screen (previously no
+      item did this at all).
+- [ ] No script errors appear in the console across a full loop: open
+      the new words in Gate UI, generate a Frost/Storm/Ancient/Fracture
+      dungeon, fight a Thornling and a Brinewisp, and find/equip at
+      least 2 of the 5 new items.
+
 ## Exit criteria for Phase 6 (Boss + Polish) — manual, needs a display
 
 Not yet run against this build.

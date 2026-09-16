@@ -27,7 +27,17 @@ const TIER_ENCOUNTER_TILES := [
 	[Vector2i(11, 6), Vector2i(10, 2), Vector2i(10, 9)],
 	[Vector2i(12, 7), Vector2i(11, 3), Vector2i(11, 11), Vector2i(19, 4)],
 ]
-const ENEMY_POOL: Array[String] = ["ember_wisp", "bramble_husk"]
+const DEFAULT_ENEMY_POOL: Array[String] = ["ember_wisp", "bramble_husk"]
+# Content-expansion pass: Verdant/Drowned dungeons get a themed enemy
+# instead of the generic duo every origin used to share. Any origin not
+# listed here (including the two new Frost/Storm themes) still falls
+# back to DEFAULT_ENEMY_POOL — not every theme needs unique monster
+# content yet, per the original Phase 5 scope decision; this only
+# partially revises it where it was cheap to.
+const ORIGIN_ENEMY_POOL := {
+	"Verdant": ["bramble_husk", "thornling"],
+	"Drowned": ["ember_wisp", "brinewisp"],
+}
 
 @onready var ground: TileMapLayer = $Ground
 @onready var obstacles: Node2D = $Obstacles
@@ -57,10 +67,11 @@ func _ready() -> void:
 	door.target_map_id = "waymark"
 	add_child(door)
 
+	var enemy_pool: Array[String] = ORIGIN_ENEMY_POOL.get(profile.origin_word, DEFAULT_ENEMY_POOL)
 	for tile in TIER_ENCOUNTER_TILES[tier]:
 		var trigger := ENCOUNTER_MARKER_SCENE.instantiate()
 		trigger.position = _tile_center(tile)
-		trigger.enemy_ids = ENEMY_POOL
+		trigger.enemy_ids = enemy_pool
 		trigger.level = profile.level
 		trigger.can_flee = true
 		trigger.loot_table_id_override = profile.loot_table_id

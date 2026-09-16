@@ -6,5 +6,5 @@
 script = ExtResource("1")
 id = "generated_high_loot"
 drop_chance = 0.75
-item_ids = Array[String](["cinderfall_cleaver", "ashcinder_guard"])
-weights = Array[int]([3, 1])
+item_ids = Array[String](["cinderfall_cleaver", "ashcinder_guard", "stormcaller_pendant"])
+weights = Array[int]([3, 3, 1])

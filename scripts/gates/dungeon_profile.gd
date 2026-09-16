@@ -14,16 +14,30 @@ var branch_tier: int = 0 # 0..3 — also picks map size (see GeneratedDungeon)
 var loot_table_id: String = ""
 
 # Origin -> which world_tileset.tres floor source is this dungeon's theme.
+# Frost/Storm added in the content-expansion pass (their own new tile
+# themes, sources 7/8 — see world_tileset.tres); no code elsewhere reads
+# floor_source_id as anything but an opaque paint id, so adding a theme
+# is just a new tile + a new dict entry.
 const ORIGIN_FLOOR_SOURCE := {
-	"Cinder": 2, "Verdant": 3, "Drowned": 4, "Hollow": 5,
+	"Cinder": 2, "Verdant": 3, "Drowned": 4, "Hollow": 5, "Frost": 7, "Storm": 8,
 }
 # Tone -> how many levels above the baseline this dungeon's enemies are.
+# Ancient (content-expansion pass) is the first Tone word to reach past
+# the original 1-4 range (level 5); EnemyScaler's scale_factor and
+# _loot_table_for_level()'s `level >= 4 -> high loot` bucket both
+# already generalize past level 4 with no code changes — verified with
+# a balance sweep before shipping this word (see PROGRESS.md).
 const TONE_LEVEL_OFFSET := {
-	"Silent": 0, "Broken": 1, "Forgotten": 2, "Undying": 3,
+	"Silent": 0, "Broken": 1, "Forgotten": 2, "Undying": 3, "Ancient": 4,
 }
 # Sign -> how many side branches the generated layout has (0..3).
+# Fracture (content-expansion pass) intentionally reuses tier 3 — a 5th
+# distinct branch_tier would need a 5th hand-verified layout template
+# (GeneratedDungeon.gd's TIER_* arrays are all sized 4), which is
+# systems work, not content; multiple Sign words sharing a tier is a
+# deliberate, low-cost way to grow the word pool without that.
 const SIGN_BRANCH_TIER := {
-	"Ember": 0, "Gale": 1, "Tide": 2, "Umbra": 3,
+	"Ember": 0, "Gale": 1, "Tide": 2, "Umbra": 3, "Fracture": 3,
 }
 
 static func compute(origin: String, tone: String, sign: String) -> DungeonProfile:

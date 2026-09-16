@@ -488,10 +488,24 @@ content:
 
 | Field | Driven by | Range / meaning |
 |---|---|---|
-| `level` | Tone | 1-4 (`1 + TONE_LEVEL_OFFSET[tone]`) — scales enemy stats and picks a loot tier |
+| `level` | Tone | 1-5 (`1 + TONE_LEVEL_OFFSET[tone]`) — scales enemy stats and picks a loot tier |
 | `floor_source_id` | Origin | which `world_tileset.tres` source is this dungeon's floor (visual theme) |
 | `branch_tier` | Sign | 0-3 — how many side branches/how large the generated layout is |
-| `loot_table_id` | derived from `level` | `generated_low_loot` (≤2) / `generated_mid_loot` (3) / `generated_high_loot` (4) |
+| `loot_table_id` | derived from `level` | `generated_low_loot` (≤2) / `generated_mid_loot` (3) / `generated_high_loot` (≥4) |
+
+**Word pool (content-expansion pass, post-Phase-6):** grew from 4 to 6
+Origin words (added Frost/Storm, each with its own new floor theme —
+`floor_source_id` is read as an opaque paint id everywhere, so a new
+theme is just a new tile texture + tileset source + dict entry, no
+code changes), 4 to 5 Tone words (added Ancient, the first word to
+reach level 5 — `EnemyScaler.scale_factor()` and
+`_loot_table_for_level()`'s `>= 4` bucket both already generalize past
+the original 1-4 range), and 4 to 5 Sign words (added Fracture,
+deliberately mapped onto the existing tier 3 rather than a new tier 4 —
+a 5th `branch_tier` would need a 5th hand-verified layout template,
+which is systems work, not content). `GateUI` needed zero changes —
+its option lists are already populated by scanning
+`data/gates/keywords/`, not a hardcoded word list.
 
 **Why the layout itself is templated, not randomly generated per
 combination:** this sandbox has no display, so a genuinely unique
@@ -509,6 +523,16 @@ rather than unique per combination. All 4 templates' reachability
 (every doorway and encounter spot reachable from spawn) was verified
 with the same BFS self-test technique used for Cinderfall Woods in
 Phase 1 — see PROGRESS.md.
+
+**Origin-aware enemy pool (content-expansion pass):**
+`GeneratedDungeon`'s `ORIGIN_ENEMY_POOL` dictionary maps an origin word
+to its own enemy pair (`Verdant` -> Bramble Husk + the new Thornling,
+`Drowned` -> Ember Wisp + the new Brinewisp); any origin not listed
+(Cinder, Hollow, and the new Frost/Storm) still falls back to
+`DEFAULT_ENEMY_POOL`. This only partially revises the Phase 5 decision
+that generated dungeons don't need per-Origin monster content — it
+extends it where a themed enemy was cheap to add, without committing
+to unique content for every current and future Origin word.
 
 **How a generated encounter differs from a hand-authored one:**
 `GeneratedEncounterTrigger` (`scripts/world/generated_encounter_trigger.gd`)

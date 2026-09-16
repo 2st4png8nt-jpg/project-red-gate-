@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "brinewisp"
+display_name = "Brinewisp"
+family = "drowned"
+max_hp = 15
+attack = 3
+defense = 1
+magic_power = 5
+speed = 5
+xp_reward = 8
+gold_reward = 4
+skill_ids = Array[String](["brinewisp_undertow"])
+loot_table_id = "generated_mid_loot"
+gate_clue_id = ""

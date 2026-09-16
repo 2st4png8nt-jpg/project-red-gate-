@@ -192,6 +192,23 @@ Delivered in the post-Phase-5 systems-depth pass:
   see GAME_DESIGN.md's progression table and the note on what that
   means for a player who rushes the Red Gate early.
 
+Delivered in the content-expansion pass (post-Phase-6): 5 new
+`EquipmentData` items, all req. level 1-2 except one:
+- **Verdant Fang** (uncommon weapon, lvl2) — a second uncommon weapon
+  alternative to Cinderfall Cleaver, its own moveset
+  (`verdant_fang_piercing_thorn`, Agent 2's `data/skills/`).
+- **Iron Buckler** (uncommon armor, lvl2) and **Brinewoven Robe**
+  (uncommon armor, lvl2, the first gear to boost Magic Power at all —
+  every elemental skill has scaled off it since the systems-depth pass,
+  but no item raised it until now) — a second and third armor option
+  before Ashcinder Guard's Rare tier.
+- **Windward Ring** (uncommon accessory, lvl1) — a second accessory
+  alongside Lucky Charm, leaning on Speed/max MP now that Speed drives
+  initiative (Phase 6).
+- **Stormcaller Pendant** (rare accessory, lvl3) — a level-4-dungeon-
+  exclusive find so `generated_high_loot` isn't just earlier items
+  repeated at better odds.
+
 ## AGENT 4 — World / Gate
 
 Owns: `scripts/world/`, `scripts/gates/`, `data/maps/`, `data/gates/`.
@@ -276,6 +293,25 @@ Delivered in Phase 5:
   `tile_hollow.svg` (the 3 remaining Origin themes) and
   `tile_redgate.svg`, all added as new sources in the shared
   `world_tileset.tres` (ids 3-6) rather than per-theme tileset files.
+
+Delivered in the content-expansion pass (post-Phase-6):
+- 4 new `GateKeywordData` rows in `data/gates/keywords/`: Frost/Storm
+  (origin), Ancient (tone), Fracture (sign) — the word pool grows from
+  12 to 16 words. `GateUI` and `GateResolver` needed no changes; both
+  were already fully data-driven against this directory.
+- `tile_frost.svg`/`tile_storm.svg`, 2 new `world_tileset.tres` sources
+  (ids 7-8), and 2 new `DungeonProfile.ORIGIN_FLOOR_SOURCE` entries —
+  Frost and Storm each get a genuinely distinct visual theme, not a
+  reskin of an existing one.
+- `DungeonProfile.TONE_LEVEL_OFFSET` gained Ancient -> 4 (level 5, the
+  first Tone word past the original 1-4 range) and
+  `SIGN_BRANCH_TIER` gained Fracture -> 3 (deliberately reusing Umbra's
+  tier rather than requiring a 5th layout template) — see the Open
+  Interface Decisions Log for why each extends safely.
+- `GeneratedDungeon.ORIGIN_ENEMY_POOL` — Verdant and Drowned dungeons
+  now spawn a themed enemy (Agent 6's Thornling/Brinewisp) instead of
+  always the same duo; every other origin (including Frost/Storm)
+  still falls back to the original pool.
 
 ## AGENT 5 — UI / UX
 
@@ -412,6 +448,30 @@ Delivered in Phase 6 (Boss + Polish):
   `enrage_skill_id = "ashen_warden_cinderquake"`; new
   `data/skills/ashen_warden_cinderquake.tres` (power 24, ember) as its
   enrage skill, stronger than its default Ashfall (power 14).
+
+Delivered in the content-expansion pass (post-Phase-6): 2 new common
+enemies, stat-calibrated against Ember Wisp/Bramble Husk (similar HP/
+attack magnitude, so the Phase 6 balance sweep's conclusions extend
+without needing a full re-sweep — spot-checked anyway, see PROGRESS.md):
+- **Thornling** (`verdant` family, 22 HP, high Defense/low Speed — a
+  tankier melee profile than Bramble Husk) with its own skill, Bramble
+  Lash (physical, power 8).
+- **Brinewisp** (`drowned` family, 15 HP, Magic Power-leaning caster)
+  with Undertow (element `"tide"`, power 5) — the first common enemy
+  whose skill scales off Magic Power rather than Attack, exercising the
+  systems-depth pass's element-aware `CombatMath.skill_power_stat()`
+  outside of Ember Wisp.
+
+Both enemies are used only via `GeneratedDungeon.ORIGIN_ENEMY_POOL`
+(Agent 4), never placed in Cinderfall Woods, so their own
+`loot_table_id` field is inert today (generated encounters always use
+`EncounterData.loot_table_id_override`, per Phase 5's design) — both
+point at `generated_mid_loot` anyway as a safe, always-valid default
+rather than leaving it empty, in case that ever changes.
+
+`generated_low_loot`/`generated_mid_loot`/`generated_high_loot` each
+gained new items (Agent 3's new gear) at modest weights alongside their
+existing entries — see GAME_DESIGN.md Section 11 for the full table.
 
 ## AGENT 7 — Art / Presentation
 
@@ -693,3 +753,35 @@ re-litigates it (CLAUDE.md Section 19).
   per-map author effort, and is trivially replaceable later if real
   lighting art/shaders are ever authored — see ARCHITECTURE.md Section
   7b.
+- **2026-09-16 (content-expansion pass)** — Decided the new Tone word
+  Ancient is allowed to push `level` to 5, past the original 1-4 range
+  CLAUDE.md/GAME_DESIGN.md described. Checked first, not assumed safe:
+  `EnemyScaler.scale_factor()` is a simple linear formula with no upper
+  bound baked in, and `DungeonProfile._loot_table_for_level()`'s final
+  `else` branch already treats "4 or higher" as one bucket rather than
+  hardcoding `== 4`. Verified with a balance-sweep extension to level 5
+  before shipping the word (see PROGRESS.md) rather than trusting the
+  formulas alone — the same "measure, then adjust" standard as every
+  other balance-relevant change in this project.
+- **2026-09-16 (content-expansion pass)** — Decided the new Sign word
+  Fracture reuses `branch_tier = 3` (Umbra's tier) rather than
+  introducing a `branch_tier = 4`. `GeneratedDungeon`'s per-tier arrays
+  (`TIER_MAP_SIZE`, `TIER_DOORWAY_ROW`, `TIER_ENCOUNTER_TILES`) are all
+  hand-sized and hand-verified for exactly 4 tiers (0-3); a 5th tier
+  means a 5th layout template that needs the same BFS-reachability
+  verification the existing 4 got, which is systems/architecture work,
+  not the "more words" content ask. Two Sign words sharing a tier is a
+  deliberate, cheap way to grow the word pool without that — the
+  mystery is still in not knowing which word does what, and nothing
+  stops a future pass from adding a real 5th template later.
+- **2026-09-16 (content-expansion pass)** — Decided to partially, not
+  fully, revisit the Phase 5 call that generated dungeons don't need
+  per-Origin monster variety (CLAUDE.md's "3-5 enemy types" scope
+  guidance was the reason given then). Added exactly 2 new enemies
+  (bringing the roster to 6) and wired them to exactly 2 origins
+  (Verdant, Drowned) via `ORIGIN_ENEMY_POOL`, leaving Cinder/Hollow and
+  the two brand-new Frost/Storm origins on the original shared pool.
+  This is a deliberate, incremental widening of that original scope
+  cap — recorded here rather than silently exceeding it — not a full
+  "unique monsters per Origin" system, which would be 6 more enemies
+  for marginal payoff at this stage.

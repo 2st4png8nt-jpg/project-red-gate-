@@ -7,6 +7,115 @@ Section 28).
 
 ---
 
+## 2026-09-16 — Content-expansion pass: more enemies, gear, Gate words (post-Phase-6)
+
+STATUS: COMPLETE
+
+Phase 6 was the last CLAUDE.md-defined phase; asked which direction
+"expand the game" (Section 23) should take, the project owner chose
+more content within existing systems over new systems — more enemies,
+gear, and Gate words, no new mechanics.
+
+IMPLEMENTED:
+- **4 new Gate words** (12 -> 16): **Frost**/**Storm** (Origin, each
+  with its own new floor tile theme — `tile_frost.svg`/`tile_storm.svg`,
+  2 new `world_tileset.tres` sources), **Ancient** (Tone, level 5 — the
+  first word past the original 1-4 range), **Fracture** (Sign, reuses
+  tier 3 rather than a new unverified layout template). `GateUI` and
+  `GateResolver` needed zero code changes — both already scan
+  `data/gates/keywords/` rather than using a hardcoded list.
+- **2 new common enemies**: **Thornling** (`verdant` family, tanky
+  physical) and **Brinewisp** (`drowned` family, the first common enemy
+  built around Magic Power). `GeneratedDungeon` gained an
+  `ORIGIN_ENEMY_POOL` so Verdant/Drowned dungeons spawn a themed enemy
+  instead of the same duo every origin used to share; every other
+  origin (including the new Frost/Storm) still falls back to the
+  original pool.
+- **5 new gear items**: Windward Ring (Speed/MP accessory), Verdant
+  Fang (weapon with a new moveset, Piercing Thorn), Iron Buckler and
+  Brinewoven Robe (two new armor options — Brinewoven Robe is the
+  *first item in the game to raise Magic Power at all*), and
+  Stormcaller Pendant (a Rare accessory exclusive to level-4+ dungeon
+  loot, so the high tier isn't just earlier items at better odds). All
+  wired into `generated_low/mid/high_loot` at modest weights alongside
+  the existing entries.
+
+FILES CHANGED:
+- New: `art/tiles/tile_frost.svg`, `art/tiles/tile_storm.svg`,
+  `data/gates/keywords/{frost,storm,ancient,fracture}.tres`,
+  `data/enemies/{thornling,brinewisp}.tres`,
+  `data/skills/{thornling_bramble_lash,brinewisp_undertow,verdant_fang_piercing_thorn}.tres`,
+  `data/items/{verdant_fang,iron_buckler,brinewoven_robe,windward_ring,stormcaller_pendant}.tres`.
+- Modified: `art/tiles/world_tileset.tres` (2 new sources),
+  `scripts/gates/dungeon_profile.gd` (3 dict extensions),
+  `scripts/world/generated_dungeon.gd` (`ORIGIN_ENEMY_POOL`),
+  `data/loot/generated_{low,mid,high}_loot.tres` (new items added).
+
+INTERFACES CHANGED: none — this pass is pure content on top of Phase
+0-6 schemas. No new `EnemyData`/`EquipmentData`/`SkillData` fields were
+needed.
+
+TESTS:
+- Headless self-tests (temporary code in `boot.gd`, reverted after,
+  confirmed via `git diff --stat` showing no changes):
+  - Verified `DungeonProfile.compute("Frost", "Ancient", "Fracture")`
+    resolves to exactly `level=5, floor_source_id=7, branch_tier=3,
+    loot_table_id="generated_high_loot"`, and `Storm` resolves to
+    `floor_source_id=8`.
+  - Verified every new enemy, its skill(s), every new item, and every
+    new item's moveset skill (where set) load without error via
+    `DataLoader`.
+  - Verified every item id referenced in the 3 generated loot tables
+    resolves to a real `ItemData` (catches a typo'd id that would
+    otherwise silently show up as "Found: " with no item at runtime).
+  - Extended the Phase 6 balance-sweep style check to levels 1-5 and to
+    all 4 common enemies (including the 2 new ones), this time using
+    each enemy's *worst case* (as if it used its skill every turn,
+    which the Phase 6 AI-variety change prevents from actually
+    happening) rather than only its basic attack. Even under that
+    pessimistic assumption, no enemy ever kills the player in fewer
+    than 3 hits at any level 1-5, and the numbers scale proportionally
+    with no anomaly at the new level 5 — Ancient was safe to ship
+    without adjusting `EnemyScaler` or `CombatMath.MITIGATION_K`.
+  - Loaded a `Frost + Silent + Gale` generated dungeon headlessly (no
+    script errors) and captured an Xvfb + Mesa llvmpipe screenshot
+    confirming the new icy floor theme renders correctly (shown to the
+    project owner).
+- A full headless smoke run (`godot4 --headless --path . --quit-after 10`)
+  passed cleanly after all changes (required the usual class-cache
+  rebuild pass first, since new `class_name`-less content doesn't need
+  it but this run followed script changes from the same session).
+
+KNOWN ISSUES:
+- Thornling/Brinewisp are reachable only through generated dungeons
+  (`GeneratedDungeon.ORIGIN_ENEMY_POOL`), never through Cinderfall
+  Woods — their own `EnemyData.loot_table_id` field is consequently
+  inert today (generated encounters always use
+  `EncounterData.loot_table_id_override`); both point at
+  `generated_mid_loot` as a safe default rather than being left empty.
+- Cinder, Hollow, Frost, and Storm dungeons still reuse Ember Wisp/
+  Bramble Husk rather than getting their own themed enemy — a
+  deliberate, incremental widening of the original "3-5 enemy types"
+  scope cap (now 6), not a full per-Origin monster roster. Recorded as
+  a decision, not an oversight — see AGENT_CONTRACTS.md.
+- As with every content-only pass in this project, only headless logic
+  validation, self-tests, and one screenshot were possible — no
+  interactive playtest of how the new gear/enemies/words actually feel
+  in a real session.
+
+FOLLOW-UP:
+- If a future pass wants full per-Origin monster variety, Cinder/
+  Hollow/Frost/Storm are the remaining gaps in `ORIGIN_ENEMY_POOL`.
+- A genuine 5th `branch_tier` (rather than Fracture reusing tier 3)
+  would need a new hand-verified layout template in
+  `GeneratedDungeon`'s `TIER_*` arrays, following the same BFS-
+  reachability process used for the original 4.
+- No further content is planned unless requested — this was a
+  deliberate, bounded expansion of existing systems, not the start of
+  an open-ended content backlog.
+
+---
+
 ## 2026-09-16 — Phase 6: Boss + Polish established
 
 STATUS: COMPLETE

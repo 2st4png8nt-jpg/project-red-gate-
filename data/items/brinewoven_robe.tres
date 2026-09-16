@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EquipmentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/equipment_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "brinewoven_robe"
+display_name = "Brinewoven Robe"
+description = "Cloth woven from something that was never quite dry."
+rarity = "uncommon"
+level_requirement = 2
+value = 40
+source = "Drowned Reach drop"
+slot = "armor"
+defense_bonus = 4
+magic_power_bonus = 6

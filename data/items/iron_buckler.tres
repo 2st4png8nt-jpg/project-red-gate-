@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EquipmentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/equipment_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "iron_buckler"
+display_name = "Iron Buckler"
+description = "A dented but dependable shield, plain and sturdy."
+rarity = "uncommon"
+level_requirement = 2
+value = 38
+source = "Generated dungeon drop"
+slot = "armor"
+defense_bonus = 7
+max_hp_bonus = 3

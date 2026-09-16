@@ -106,18 +106,22 @@ A Gate combination is three keywords, one from each category:
 - Verdant
 - Drowned
 - Hollow
+- Frost *(added content-expansion pass — its own icy floor theme)*
+- Storm *(added content-expansion pass — its own stormy floor theme)*
 
 **TONE** (mood/modifier)
 - Silent
 - Broken
 - Forgotten
 - Undying
+- Ancient *(added content-expansion pass — the first Tone word past level 4)*
 
 **SIGN** (elemental attribute)
 - Ember
 - Tide
 - Gale
 - Umbra
+- Fracture *(added content-expansion pass — as branching/dangerous as Umbra; a deliberate lore callback to Section 3's Fracture, and the pool's first two-words-one-tier case)*
 
 ### How a combination resolves (Phase 5 — implemented)
 
@@ -151,19 +155,28 @@ end up:
 
 | Word category | Controls | Prototype values |
 |---|---|---|
-| **ORIGIN** | Visual theme (floor tile palette) | Cinder=ash, Verdant=lush green, Drowned=teal/wet, Hollow=dark void |
-| **TONE** | Enemy level (1-4), which scales enemy stats and which loot tier drops | Silent=1, Broken=2, Forgotten=3, Undying=4 |
-| **SIGN** | Dungeon shape/size (0-3 side branches) | Ember=0 (small, single room), Gale=1, Tide=2, Umbra=3 (large, most branching) |
+| **ORIGIN** | Visual theme (floor tile palette), and which enemies spawn | Cinder=ash, Verdant=lush green, Drowned=teal/wet, Hollow=dark void, Frost=icy blue, Storm=stormy grey |
+| **TONE** | Enemy level (1-5), which scales enemy stats and which loot tier drops | Silent=1, Broken=2, Forgotten=3, Undying=4, Ancient=5 |
+| **SIGN** | Dungeon shape/size (0-3 side branches) | Ember=0 (small, single room), Gale=1, Tide=2, Umbra=3 / Fracture=3 (large, most branching) |
 
-A generated dungeon reuses the same two Cinderfall Woods enemies (Ember
-Wisp, Bramble Husk) at the computed level, rather than needing unique
-monster art/stats per Origin theme — see Section 24 on scope discipline.
+A generated dungeon reused the same two Cinderfall Woods enemies (Ember
+Wisp, Bramble Husk) at the computed level for every Origin through
+Phase 6. The content-expansion pass gave **Verdant** and **Drowned**
+their own themed enemy — the tanky **Thornling** and the caster
+**Brinewisp**, respectively — alongside one of the originals; every
+other Origin (Cinder, Hollow, and the new Frost/Storm) still uses the
+shared duo. This is a deliberate partial step, not full per-Origin
+monster variety (still mindful of Section 24's scope discipline) — see
+AGENT_CONTRACTS.md's Open Interface Decisions Log.
+
 The *shape* of a dungeon (which physical layout template a given branch
 tier uses) is currently one of 4 fixed templates, not a unique random
 layout per word triple; see ARCHITECTURE.md Section 7a for the reasoning
 (this sandbox has no display to catch a broken randomly-generated
 layout, so the layout itself stays deterministic and pre-verified while
-level/theme/loot still vary with the words).
+level/theme/loot still vary with the words). Fracture reuses Umbra's
+template (tier 3) rather than adding a genuinely new, unverified 5th
+one.
 
 ## 7. Maps
 
@@ -300,19 +313,25 @@ the fight into two phases — survive the opening exchanges, then weather
 a harder back half — without needing a full scripted-phase boss AI
 framework the prototype's single boss doesn't justify yet.
 
-### Enemies (prototype set)
-- Ember Wisp (common — Cinderfall Woods, and reused at scaled level/stats
-  in every generated dungeon; see Section 6's word-driven generation)
+### Enemies (prototype set — 6, content-expansion pass)
+- Ember Wisp (common — Cinderfall Woods, and the default reused enemy
+  in most generated dungeons; see Section 6's word-driven generation)
 - Bramble Husk (common — same reuse as Ember Wisp)
+- **Thornling** (common — Verdant-origin dungeons only; tankier/slower
+  than the two above, physical)
+- **Brinewisp** (common — Drowned-origin dungeons only; the first
+  common enemy built around Magic Power rather than Attack)
 - Cinder Wraith (Cinderfall Woods mini-boss, drops a Gate clue)
 - **Ashen Warden** (Red Gate boss — the only enemy with an enrage phase)
 
 Tideling and Hollow Stalker were originally planned as Silent Marsh's
 enemies; since Silent Marsh as a distinct hand-authored map is
-superseded by Phase 5's generation system (see Section 7), they're not
-built and not currently planned — generated dungeons reuse the two
-common enemies above rather than needing unique monster content per
-Origin theme (CLAUDE.md's "3-5 enemy types" scope guidance).
+superseded by Phase 5's generation system (see Section 7), they're
+still not built — Thornling/Brinewisp are new content, not a revival
+of those two. Cinder, Hollow, Frost, and Storm dungeons still reuse
+Ember Wisp/Bramble Husk rather than getting unique monsters, a
+deliberate partial (not full) revision of CLAUDE.md's "3-5 enemy
+types" scope guidance — see AGENT_CONTRACTS.md's decision log.
 
 ### Player abilities (prototype set, 3–5)
 - Basic Attack (free, weapon-scaled)
@@ -344,15 +363,20 @@ now gates the Equip button in the inventory screen, so gear
 progression actually paces with player level instead of being
 available from turn one.
 
-### Progression, as actually implemented (Phases 3-5, level-gated post-Phase-5)
+### Progression, as actually implemented (Phases 3-6, content-expansion pass)
 
 | Item | Rarity | Req. Lv | Stats | Moveset | Source |
 |---|---|---|---|---|---|
 | Rusted Shortsword | Common | 1 | +6 Attack | — | Waymark shop |
 | Traveler's Vest | Common | 1 | +3 Defense, +5 max HP | — | Waymark shop |
 | Lucky Charm | Common | 1 | +2 Speed | — | Waymark shop |
+| Windward Ring | Uncommon | 1 | +4 Speed, +5 max MP | — | Generated dungeon drop (low tier) |
 | Cinderfall Cleaver | Uncommon | 2 | +14 Attack | Cleave | Cinderfall Woods / generated-dungeon drop |
+| Verdant Fang | Uncommon | 2 | +12 Attack | Piercing Thorn | Generated dungeon drop (mid tier) |
+| Iron Buckler | Uncommon | 2 | +7 Defense, +3 max HP | — | Generated dungeon drop (mid tier) |
+| Brinewoven Robe | Uncommon | 2 | +4 Defense, +6 Magic Power | — | Generated dungeon drop (mid tier) |
 | Ashcinder Guard | Rare | 2 | +10 Defense, +10 max HP | — | Cinder Wraith drop, or a level-4 generated dungeon |
+| Stormcaller Pendant | Rare | 3 | +6 Magic Power, +3 Speed | — | Generated dungeon drop (high tier only) |
 | **Cindermourn** | **Unique** | 3 | +35 Attack, +15% damage vs. the `"ashen"` family, restores 5 MP on kill | Ashbrand | Ashen Warden (Red Gate) drop — the only guaranteed unique |
 
 Cindermourn is deliberately *not* just a bigger number than the Rare
@@ -360,6 +384,13 @@ tier above it. It trades some of the raw Attack a min-maxed build might
 want for a build-defining effect, per the design pillar in Section 4 of
 CLAUDE.md — and unlike the earlier illustrative draft of this table,
 every row here is real, implemented content, not a placeholder example.
+
+Brinewoven Robe and Stormcaller Pendant are the first items to raise
+Magic Power at all — every elemental Skill has scaled off that stat
+since the systems-depth pass, but no gear touched it until this pass,
+so a caster-leaning build had nothing to invest in. Windward Ring and
+Stormcaller Pendant likewise lean on Speed, meaningful since Phase 6
+made it decide combat initiative.
 
 ## 12. Design Pillars (from CLAUDE.md, restated for quick reference)
 

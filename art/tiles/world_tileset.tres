@@ -1,4 +1,4 @@
-[gd_resource type="TileSet" load_steps=9 format=3]
+[gd_resource type="TileSet" load_steps=11 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tiles/tile_grass.svg" id="1"]
 [ext_resource type="Texture2D" path="res://art/tiles/tile_dirt.svg" id="2"]
@@ -7,6 +7,8 @@
 [ext_resource type="Texture2D" path="res://art/tiles/tile_drowned.svg" id="5"]
 [ext_resource type="Texture2D" path="res://art/tiles/tile_hollow.svg" id="6"]
 [ext_resource type="Texture2D" path="res://art/tiles/tile_redgate.svg" id="7"]
+[ext_resource type="Texture2D" path="res://art/tiles/tile_frost.svg" id="8"]
+[ext_resource type="Texture2D" path="res://art/tiles/tile_storm.svg" id="9"]
 
 [sub_resource type="TileSetAtlasSource" id="AtlasSource_grass"]
 texture = ExtResource("1")
@@ -43,6 +45,16 @@ texture = ExtResource("7")
 texture_region_size = Vector2i(32, 32)
 0:0/0 = 0
 
+[sub_resource type="TileSetAtlasSource" id="AtlasSource_frost"]
+texture = ExtResource("8")
+texture_region_size = Vector2i(32, 32)
+0:0/0 = 0
+
+[sub_resource type="TileSetAtlasSource" id="AtlasSource_storm"]
+texture = ExtResource("9")
+texture_region_size = Vector2i(32, 32)
+0:0/0 = 0
+
 [resource]
 tile_size = Vector2i(32, 32)
 sources/0 = SubResource("AtlasSource_grass")
@@ -52,3 +64,5 @@ sources/3 = SubResource("AtlasSource_verdant")
 sources/4 = SubResource("AtlasSource_drowned")
 sources/5 = SubResource("AtlasSource_hollow")
 sources/6 = SubResource("AtlasSource_redgate")
+sources/7 = SubResource("AtlasSource_frost")
+sources/8 = SubResource("AtlasSource_storm")
