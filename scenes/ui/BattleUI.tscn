@@ -86,3 +86,9 @@ offset_bottom = 352.0
 
 [node name="BackButton" type="Button" parent="Root/SkillMenu"]
 text = "Back"
+
+[node name="HitFlash" type="ColorRect" parent="Root"]
+mouse_filter = 2
+offset_right = 640.0
+offset_bottom = 360.0
+color = Color(1, 1, 1, 0)

@@ -50,6 +50,7 @@ func _ready() -> void:
 	player.position = _tile_center(Vector2i(2, doorway_row))
 	add_child(player)
 	player.set_camera_limits(Rect2i(Vector2i.ZERO, map_size * TILE_SIZE))
+	DungeonAmbience.apply(self, player)
 
 	var door := DOORWAY_SCENE.instantiate()
 	door.position = _tile_center(Vector2i(0, doorway_row))

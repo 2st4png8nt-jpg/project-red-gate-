@@ -17,3 +17,5 @@ gold_reward = 30
 skill_ids = Array[String](["ashen_warden_ashfall"])
 loot_table_id = "ashen_warden_loot"
 gate_clue_id = ""
+enrage_threshold = 0.5
+enrage_skill_id = "ashen_warden_cinderquake"

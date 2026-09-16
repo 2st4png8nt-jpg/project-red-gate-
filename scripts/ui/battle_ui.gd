@@ -7,6 +7,8 @@ extends CanvasLayer
 const UNIVERSAL_SKILL_IDS := ["ember_slash", "guard_break", "second_wind"]
 
 @onready var battle_manager: Node = get_parent()
+@onready var root: Control = $Root
+@onready var hit_flash: ColorRect = $Root/HitFlash
 @onready var enemy_name_label: Label = $Root/EnemyPanel/EnemyName
 @onready var enemy_hp_label: Label = $Root/EnemyPanel/EnemyHP
 @onready var player_hp_label: Label = $Root/PlayerPanel/PlayerHP
@@ -50,6 +52,8 @@ func _ready() -> void:
 	battle_manager.battle_won.connect(_on_battle_won)
 	battle_manager.battle_lost.connect(_on_battle_lost)
 	battle_manager.battle_fled.connect(_on_battle_fled)
+	battle_manager.enemy_hit.connect(_on_enemy_hit)
+	battle_manager.player_hit.connect(_on_player_hit)
 
 	enemy_name_label.text = battle_manager.enemy.display_name
 	message_label.text = "A wild %s appears!" % battle_manager.enemy.display_name
@@ -89,6 +93,31 @@ func _on_turn_state_changed(state_name: String) -> void:
 func _on_action_resolved(message: String) -> void:
 	message_label.text = message
 
+## Combat feedback polish (Phase 6): a quick tint + shake reacting to
+## BattleManager's enemy_hit/player_hit signals. Pure presentation — no
+## combat math lives here, only damage numbers already computed elsewhere.
+func _on_enemy_hit(_damage: int) -> void:
+	_flash(Color(1.0, 0.9, 0.6, 0.5))
+	_shake(5.0)
+	Sfx.play("hit")
+
+func _on_player_hit(_damage: int) -> void:
+	_flash(Color(0.9, 0.1, 0.1, 0.45))
+	_shake(8.0)
+	Sfx.play("hit")
+
+func _flash(color: Color) -> void:
+	hit_flash.color = color
+	var tween := create_tween()
+	tween.tween_property(hit_flash, "color:a", 0.0, 0.25)
+
+func _shake(strength: float) -> void:
+	var tween := create_tween()
+	for i in range(4):
+		var offset := Vector2(randf_range(-strength, strength), randf_range(-strength, strength))
+		tween.tween_property(root, "position", offset, 0.04)
+	tween.tween_property(root, "position", Vector2.ZERO, 0.04)
+
 func _on_battle_won(xp: int, gold: int, leveled_up: bool, loot_item_name: String, clue_discovered: bool) -> void:
 	command_menu.hide()
 	skill_menu.hide()
@@ -96,6 +125,7 @@ func _on_battle_won(xp: int, gold: int, leveled_up: bool, loot_item_name: String
 	var loot_text := " Found: %s!" % loot_item_name if loot_item_name != "" else ""
 	var clue_text := " A note falls from the wreckage..." if clue_discovered else ""
 	message_label.text = "Victory! +%d XP, +%d gold.%s%s%s" % [xp, gold, loot_text, clue_text, extra]
+	Sfx.play("victory")
 	await get_tree().create_timer(1.2).timeout
 	SceneManager.go_to_current_map()
 
@@ -103,11 +133,13 @@ func _on_battle_lost() -> void:
 	command_menu.hide()
 	skill_menu.hide()
 	message_label.text = "You were defeated... retreating to Waymark."
+	Sfx.play("defeat")
 	await get_tree().create_timer(1.2).timeout
 	SceneManager.go_to_town()
 
 func _on_battle_fled() -> void:
 	command_menu.hide()
 	skill_menu.hide()
+	Sfx.play("flee")
 	await get_tree().create_timer(0.6).timeout
 	SceneManager.go_to_current_map()

@@ -118,6 +118,17 @@ through real logic, not flat arithmetic):
   (Agent 3 schema) — see Agent 5's `BattleUI` delivery below for where
   it's actually read.
 
+Delivered in Phase 6 (Boss + Polish):
+- `_choose_enemy_skill_id()` — every enemy now alternates basic
+  attack/skill by `enemy_turn_count` instead of always using
+  `skill_ids[0]`; a boss with `EnemyData.enrage_skill_id` set (Agent 6
+  schema/content) permanently switches to that skill once
+  `enemy_hp / max_hp` crosses `enrage_threshold`, with a one-time
+  flavor message. See ARCHITECTURE.md Section 6d.
+- `enemy_hit(damage: int)`/`player_hit(damage: int)` signals, emitted
+  alongside existing damage calculations — pure telemetry for Agent 5's
+  hit-flash/shake, no new math.
+
 ## AGENT 3 — RPG / Gear
 
 Owns: `scripts/rpg/`, `data/items/`, `data/characters/`.
@@ -322,6 +333,16 @@ Delivered in the post-Phase-5 systems-depth pass:
   specifically avoids — remove an item from inventory that was never
   actually equipped), and item rows now show their `level_requirement`.
 
+Delivered in Phase 6 (Boss + Polish):
+- `BattleUI` gained a `HitFlash` `ColorRect` (full-`Root`,
+  `mouse_filter = IGNORE`) and connects to Agent 2's new
+  `enemy_hit`/`player_hit` signals: each triggers a brief color-tint
+  tween plus a short position-shake tween on `Root`, and an
+  `Sfx.play("hit")` call (Agent 8). `_on_battle_won`/`_on_battle_lost`/
+  `_on_battle_fled` likewise gained `Sfx.play("victory"/"defeat"/"flee")`
+  calls. UI still computes no damage numbers — it only reacts to
+  signals BattleManager already emits.
+
 ## AGENT 6 — Enemy / Content
 
 Owns: `data/enemies/`, `data/encounters/`, `data/loot/`, `scripts/enemies/`.
@@ -381,6 +402,17 @@ Delivered in Phase 5:
   is its own file, to keep generated-dungeon loot content separate
   from Cinderfall-Woods-specific naming).
 
+Delivered in Phase 6 (Boss + Polish):
+- `EnemyData` gained `enrage_threshold: float`/`enrage_skill_id: String`
+  (both default to "off" — see Agent 2's `_choose_enemy_skill_id()`
+  delivery for how they're read). The old "no per-enemy behavior beyond
+  `skill_ids[0]`" note from Phase 4 no longer applies to the Ashen
+  Warden.
+- `ashen_warden.tres` set to `enrage_threshold = 0.5`,
+  `enrage_skill_id = "ashen_warden_cinderquake"`; new
+  `data/skills/ashen_warden_cinderquake.tres` (power 24, ember) as its
+  enrage skill, stronger than its default Ashfall (power 14).
+
 ## AGENT 7 — Art / Presentation
 
 Owns: `art/`, `assets/`, `scenes/world/` presentation layer.
@@ -389,11 +421,30 @@ Phase 0: no art required beyond a placeholder project icon and a solid
 color/ColorRect stand-in for the player and ground in Town.tscn.
 Placeholder art must not block system development.
 
+Delivered in Phase 6 (Boss + Polish):
+- `DungeonAmbience` (`scripts/world/dungeon_ambience.gd`) — a dim
+  `CanvasModulate` plus a runtime-generated `PointLight2D` texture that
+  follows the player, applied to Cinderfall Woods/generated dungeons/
+  the Red Gate (not Town). See ARCHITECTURE.md Section 7b. Still no
+  real art assets — this is a lighting/atmosphere trick built entirely
+  from engine primitives (`GradientTexture2D`), not new sprites.
+
 ## AGENT 8 — Audio
 
 Owns: `audio/`, `scripts/audio/`.
 
 Not started in Phase 0.
+
+Delivered in Phase 6 (Boss + Polish):
+- `ToneSynth` (`scripts/audio/tone_synth.gd`) + `Sfx` (new 6th
+  autoload, `scripts/audio/sfx.gd`) — 4 short SFX (`hit`, `victory`,
+  `defeat`, `flee`) synthesized at runtime as `AudioStreamWAV`, since
+  this sandbox has no way to source or license real audio assets. See
+  ARCHITECTURE.md Section 8a for the full reasoning and how to swap in
+  real recorded SFX later without touching the calling code.
+- `audio/sfx/` and `audio/music/` remain empty — nothing is loaded from
+  disk. If real audio assets are ever added, they belong there per the
+  original folder map, replacing `Sfx.CLIPS` entries one at a time.
 
 ## AGENT 9 — QA / Playtest
 
@@ -462,6 +513,10 @@ ARCHITECTURE.md Section 8 save-data notes if it affects save data).
 - `skill_ids: Array[String]`
 - `loot_table_id: String`
 - `gate_clue_id: String` — added Phase 4; discovered via `GameState.discover_clue()` on defeat if non-empty
+- `enrage_threshold: float` — added Phase 6; 0.0 = never enrages (every
+  non-boss enemy today)
+- `enrage_skill_id: String` — added Phase 6; the skill id `BattleManager`
+  switches to permanently once `enemy_hp / max_hp <= enrage_threshold`
 
 ### `GateKeywordData` (scripts/data/gate_keyword_data.gd)
 - `word: String`
@@ -611,3 +666,30 @@ re-litigates it (CLAUDE.md Section 19).
   values across the existing item set (starter gear at 1, Cinderfall
   Woods drops at 2, Red Gate drops at 3) since every item had shipped
   with the Phase 0 placeholder of `0`.
+- **2026-09-16 (Phase 6)** — Decided enemy AI variety is two generic
+  `EnemyData` fields (`enrage_threshold`, `enrage_skill_id`) plus one
+  branch in `BattleManager`, rather than a per-enemy behavior script or
+  a full state-machine AI system. The prototype has exactly one boss;
+  building a general AI framework for a mechanic only one enemy uses
+  would be exactly the kind of speculative generality CLAUDE.md warns
+  against. Every non-boss enemy still alternates attack/skill through
+  the same generic path, so the change also fixes the "every enemy
+  always uses its one skill" issue for the whole roster, not just the
+  boss, at no extra cost.
+- **2026-09-16 (Phase 6)** — Decided combat SFX are synthesized at
+  runtime (`ToneSynth`) rather than shipped as recorded audio files.
+  This sandbox cannot fetch or license third-party audio assets, and
+  CLAUDE.md's placeholder-art allowance is about visuals, not audio —
+  silence was the only alternative. A procedural tone is honestly
+  placeholder in the same spirit as a ColorRect tile: it exists,
+  it is clearly not final, and it does not block system development.
+  `Sfx.play(name)` is the permanent interface; only what backs each
+  clip is expected to change later.
+- **2026-09-16 (Phase 6)** — Decided dungeon "lighting" is a dim
+  `CanvasModulate` plus a `PointLight2D` with a runtime-generated
+  `GradientTexture2D`, applied only to dungeons (not Town), rather than
+  hand-placed light/shadow art per map. Zero new art assets, works
+  identically across every hand-built and generated map without
+  per-map author effort, and is trivially replaceable later if real
+  lighting art/shaders are ever authored — see ARCHITECTURE.md Section
+  7b.

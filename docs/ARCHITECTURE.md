@@ -421,6 +421,40 @@ was equipped before," and then wrongly discarding the item from
 inventory). `InventoryUI` is the one caller today; it disables the
 Equip button and shows a message when the check fails.
 
+## 6d. Enemy AI Variety & Combat Feedback (Phase 6)
+
+Phase 6's PROGRESS.md follow-up flagged that every enemy "always uses
+its one skill" — `_enemy_turn()` previously called `enemy.skill_ids[0]`
+unconditionally whenever an enemy had a skill at all, so there was
+never any actual decision-making. `BattleManager._choose_enemy_skill_id()`
+replaces that:
+
+- **Normal enemies** alternate: basic attack on odd `enemy_turn_count`
+  values, their one skill on even ones. `enemy_turn_count` resets to 0
+  in `_start_with_encounter()`.
+- **Bosses** carry two new `EnemyData` fields, `enrage_threshold: float`
+  and `enrage_skill_id: String` (both default to "off" —
+  `enrage_skill_id == ""` means an enemy never enrages, true of every
+  non-boss enemy today). Once `enemy_hp / max_hp <= enrage_threshold`,
+  `_choose_enemy_skill_id()` always returns `enrage_skill_id` instead of
+  alternating, permanently for the rest of the fight, with a one-time
+  "flames roar higher" flavor line prepended to the next action message
+  (tracked via `_just_enraged`, consumed the same turn it's set). The
+  Ashen Warden is the only enemy using this today:
+  `enrage_threshold = 0.5`, `enrage_skill_id = "ashen_warden_cinderquake"`
+  (a new, stronger skill than its default Ashfall).
+
+**Combat feedback**: `BattleManager` gained `enemy_hit(damage: int)` and
+`player_hit(damage: int)` signals, emitted alongside the existing damage
+calculations in `player_attack()`, `player_use_skill()`, and
+`_enemy_turn()` — pure telemetry, no new math. `BattleUI` connects to
+both and reacts with a screen-tint flash (`HitFlash`, a full-`Root`
+`ColorRect` with `mouse_filter = IGNORE` so it never blocks button
+clicks) and a short position-shake tween on `Root`, plus a synthesized
+"hit" sound (see Section 8a). This keeps "no combat math in UI" intact
+— BattleUI never computes a damage number, it only reacts to one
+BattleManager already decided.
+
 ## 7. Gate Resolution Contract (Phase 5 — implemented)
 
 `GateResolver.resolve(origin: String, tone: String, sign: String) -> Dictionary`
@@ -501,6 +535,27 @@ for `current_map_id == "generated"` and re-calling
 (and failing) to look up a `data/maps/generated.tres` row that doesn't
 exist.
 
+## 7b. Dungeon Ambience (Phase 6)
+
+`DungeonAmbience` (`scripts/world/dungeon_ambience.gd`, static
+`apply(map_root, player)`) is a small presentation-only helper called
+from `cinderfall_woods.gd`, `generated_dungeon.gd`, and `red_gate.gd`
+right after each instantiates its `Player` — one line per script, no
+shared base class needed since there are only 3 dungeon scripts and
+they don't otherwise share a hierarchy. It does two things:
+
+1. Adds a `CanvasModulate` (color `(0.5, 0.48, 0.62)`) to the map root,
+   dimming everything drawn in that scene's 2D canvas.
+2. Attaches a `PointLight2D` to the player, using a `GradientTexture2D`
+   built at runtime (`FILL_RADIAL`, white-to-transparent) as its
+   texture — so the player carries a soft light with them with no
+   external art asset required.
+
+Deliberately **not** applied to Town: Waymark is the safe hub and stays
+fully lit; only dungeons get the darker, tenser presentation. This is
+presentation-layer only — it has no gameplay effect and reads nothing
+from combat or progression state.
+
 ## 8. Save Data Shape (Phase 0 minimum)
 
 ```json
@@ -514,6 +569,34 @@ exist.
 
 This will grow; treat it as additive only — do not remove keys without a
 migration note in PROGRESS.md.
+
+## 8a. Audio (Phase 6)
+
+`audio/sfx/` and `audio/music/` (and `scripts/audio/`) sat empty since
+Phase 0 — CLAUDE.md's placeholder-art allowance covers visuals, but this
+sandbox also has no way to source or license real sound files, and no
+network access for fetching third-party assets. Rather than ship no
+audio feedback at all, combat SFX are synthesized at runtime instead:
+
+- **`ToneSynth`** (`scripts/audio/tone_synth.gd`, static `build(notes)`)
+  turns a list of `[frequency_hz, duration_sec]` pairs into an in-memory
+  `AudioStreamWAV` — a linear fade-out envelope on each note avoids
+  clicks at note boundaries.
+- **`Sfx`** (`scripts/audio/sfx.gd`, new 6th autoload) builds and caches
+  4 named clips (`hit`, `victory`, `defeat`, `flee`) once at startup and
+  exposes `Sfx.play(name)`, round-robining a small `AudioStreamPlayer`
+  pool so overlapping calls don't cut each other off.
+- `BattleUI` calls `Sfx.play(...)` from its existing signal handlers
+  (`_on_enemy_hit`/`_on_player_hit` -> `"hit"`, `_on_battle_won` ->
+  `"victory"`, `_on_battle_lost` -> `"defeat"`, `_on_battle_fled` ->
+  `"flee"`) — no new signals needed for audio specifically.
+
+This sandbox has no audio output device either (headless runs fall back
+to Godot's dummy audio driver), so playback itself is unverified beyond
+"does not error." Swapping in real recorded SFX later is a
+non-breaking change: replace a `Sfx.play("hit")` call site (or the
+`CLIPS` dictionary entry) with a preloaded `AudioStream` resource;
+nothing else in the audio interface changes.
 
 ## 9. Testing Approach
 

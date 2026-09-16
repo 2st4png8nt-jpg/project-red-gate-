@@ -23,6 +23,7 @@ DataLoader="*res://scripts/core/data_loader.gd"
 GameState="*res://scripts/core/game_state.gd"
 SceneManager="*res://scripts/core/scene_manager.gd"
 SaveLoad="*res://scripts/core/save_load.gd"
+Sfx="*res://scripts/audio/sfx.gd"
 
 [display]
 

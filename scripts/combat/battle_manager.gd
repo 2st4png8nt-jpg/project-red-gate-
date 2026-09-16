@@ -12,6 +12,8 @@ signal hp_mp_changed
 signal battle_won(xp: int, gold: int, leveled_up: bool, loot_item_name: String, clue_discovered: bool)
 signal battle_lost
 signal battle_fled
+signal enemy_hit(damage: int) # Phase 6 — combat feedback (hit flash/shake); UI-only concern
+signal player_hit(damage: int)
 
 enum State { PLAYER_INPUT, RESOLVING, ENEMY_TURN, WON, LOST, FLED }
 
@@ -23,6 +25,14 @@ var enemy_hp: int
 var can_flee: bool = true
 var player_defending: bool = false
 var current_encounter: EncounterData # kept for loot_table_id_override — see _win()
+
+# Enemy AI variety (Phase 6): normal enemies alternate basic
+# attack/skill instead of always using their one skill; an enraged boss
+# (see EnemyData.enrage_skill_id) overrides this once its HP threshold
+# is crossed.
+var enemy_turn_count: int = 0
+var enemy_enraged: bool = false
+var _just_enraged: bool = false
 
 func _enter_tree() -> void:
 	# Deliberately _enter_tree(), not _ready(): Godot calls _ready() on
@@ -57,6 +67,9 @@ func _start_with_encounter(encounter: EncounterData) -> void:
 	player = GameState.player
 	enemy_hp = EnemyScaler.max_hp(enemy, enemy_level)
 	player_defending = false
+	enemy_turn_count = 0
+	enemy_enraged = false
+	_just_enraged = false
 
 	# Initiative: whoever is faster acts first; turns alternate normally
 	# after that. Speed was previously decorative (turn order was
@@ -79,6 +92,7 @@ func player_attack() -> void:
 	dmg = _apply_weapon_family_bonus(dmg)
 	enemy_hp = maxi(0, enemy_hp - dmg)
 	action_resolved.emit("You attack for %d damage." % dmg)
+	enemy_hit.emit(dmg)
 	_after_player_action()
 
 func player_use_skill(skill: SkillData) -> void:
@@ -100,6 +114,7 @@ func player_use_skill(skill: SkillData) -> void:
 		dmg = _apply_weapon_family_bonus(dmg)
 		enemy_hp = maxi(0, enemy_hp - dmg)
 		action_resolved.emit("You use %s for %d damage." % [skill.display_name, dmg])
+		enemy_hit.emit(dmg)
 	hp_mp_changed.emit()
 	_after_player_action()
 
@@ -156,12 +171,14 @@ func _after_player_action() -> void:
 func _enemy_turn() -> void:
 	state = State.ENEMY_TURN
 	turn_state_changed.emit("enemy_turn")
+	enemy_turn_count += 1
 
 	var dmg: int
 	var msg: String
 	var player_defense := StatsCalculator.effective_defense(player)
-	if enemy.skill_ids.size() > 0:
-		var skill: SkillData = DataLoader.load_resource("res://data/skills/%s.tres" % enemy.skill_ids[0])
+	var skill_id := _choose_enemy_skill_id()
+	if skill_id != "":
+		var skill: SkillData = DataLoader.load_resource("res://data/skills/%s.tres" % skill_id)
 		var power_stat := CombatMath.skill_power_stat(
 			skill, EnemyScaler.attack(enemy, enemy_level), EnemyScaler.magic_power(enemy, enemy_level)
 		)
@@ -176,8 +193,13 @@ func _enemy_turn() -> void:
 		msg += " (defended)"
 	player_defending = false
 
+	if _just_enraged:
+		msg = "The %s's flames roar higher! " % enemy.display_name + msg
+		_just_enraged = false
+
 	player.hp = maxi(0, player.hp - dmg)
 	action_resolved.emit(msg)
+	player_hit.emit(dmg)
 	hp_mp_changed.emit()
 
 	if player.hp <= 0:
@@ -185,6 +207,22 @@ func _enemy_turn() -> void:
 	else:
 		state = State.PLAYER_INPUT
 		turn_state_changed.emit("player_input")
+
+## Every enemy alternates basic attack / its one skill rather than
+## spamming the skill every turn (Phase 6 — AI variety). A boss with
+## enrage_skill_id set overrides this permanently, always using that
+## skill, once enemy_hp drops to or below enrage_threshold of max HP.
+func _choose_enemy_skill_id() -> String:
+	if enemy.enrage_skill_id != "":
+		var max_hp := EnemyScaler.max_hp(enemy, enemy_level)
+		if float(enemy_hp) / float(max_hp) <= enemy.enrage_threshold:
+			if not enemy_enraged:
+				enemy_enraged = true
+				_just_enraged = true
+			return enemy.enrage_skill_id
+	if enemy.skill_ids.size() > 0 and enemy_turn_count % 2 == 0:
+		return enemy.skill_ids[0]
+	return ""
 
 func _win() -> void:
 	state = State.WON

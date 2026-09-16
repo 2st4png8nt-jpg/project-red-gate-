@@ -7,6 +7,139 @@ Section 28).
 
 ---
 
+## 2026-09-16 — Phase 6: Boss + Polish established
+
+STATUS: COMPLETE
+
+The last CLAUDE.md-defined phase before "expand the game" territory
+(Section 23). Worked the exact follow-up list the Phase 5 entry below
+left behind: boss AI variety, better map presentation, sound, combat
+feedback polish, and a balancing pass.
+
+IMPLEMENTED:
+- **Boss AI variety**: every enemy now alternates basic attack/skill by
+  turn count instead of always using its one skill (fixes the issue for
+  the whole roster, not just the boss). `EnemyData` gained
+  `enrage_threshold`/`enrage_skill_id`; the Ashen Warden enrages at 50%
+  HP, permanently switching to a new, stronger skill (**Cinderquake**,
+  power 24 vs. Ashfall's 14) with a one-time flavor message. See
+  ARCHITECTURE.md Section 6d.
+- **Combat feedback polish**: `BattleManager` gained `enemy_hit`/
+  `player_hit` signals; `BattleUI` reacts with a screen-tint flash and a
+  short screen-shake tween, purely presentational (no new damage math).
+- **Procedural audio**: `ToneSynth` synthesizes short `AudioStreamWAV`
+  jingles at runtime; a new `Sfx` autoload (6th autoload) plays `hit`/
+  `victory`/`defeat`/`flee` cues from `BattleUI`'s existing signal
+  handlers. No external audio assets exist or are needed — this
+  sandbox has no way to source or license them. See ARCHITECTURE.md
+  Section 8a.
+- **Dungeon ambience**: `DungeonAmbience` adds a dim `CanvasModulate`
+  plus a player-following `PointLight2D` (texture generated at runtime
+  via `GradientTexture2D`, no art asset) to Cinderfall Woods, every
+  generated dungeon, and the Red Gate — not Town, which stays the
+  bright safe hub. See ARCHITECTURE.md Section 7b.
+- **Balancing pass**: measured (not guessed) — a headless sweep
+  computed player-vs-common-enemy damage exchange at generated-dungeon
+  levels 1-4 with starter gear. Result: common enemies consistently
+  take 2-3 hits to kill and never come close to one-shotting the player
+  (worst case at level 4 is 4 hits to kill the player) — the curve
+  needed no adjustment. See TESTS below for the actual numbers.
+
+FILES CHANGED:
+- New: `scripts/combat/combat_math.gd` unaffected; new this phase:
+  `scripts/audio/tone_synth.gd`, `scripts/audio/sfx.gd`,
+  `scripts/world/dungeon_ambience.gd`,
+  `data/skills/ashen_warden_cinderquake.tres`.
+- Modified: `scripts/data/enemy_data.gd` (enrage fields),
+  `scripts/combat/battle_manager.gd` (AI variety, enrage, hit signals),
+  `scripts/ui/battle_ui.gd` + `scenes/ui/BattleUI.tscn` (HitFlash,
+  shake, Sfx calls), `scripts/world/cinderfall_woods.gd`,
+  `scripts/world/generated_dungeon.gd`, `scripts/world/red_gate.gd`
+  (DungeonAmbience.apply calls), `data/enemies/ashen_warden.tres`
+  (enrage values), `project.godot` (new `Sfx` autoload).
+
+INTERFACES CHANGED:
+- `EnemyData` gained `enrage_threshold: float` and
+  `enrage_skill_id: String` (both default to "off").
+- `BattleManager` gained `enemy_hit(damage: int)` and
+  `player_hit(damage: int)` signals.
+- New autoload `Sfx` (`scripts/audio/sfx.gd`), exposing
+  `Sfx.play(clip_name: String)`.
+- New static utility `DungeonAmbience.apply(map_root, player)`.
+
+TESTS:
+- Headless self-tests (temporary code in `boot.gd`/`cinderfall_woods.gd`,
+  reverted after, confirmed via `git diff --stat` showing no changes):
+  - `ToneSynth`/`Sfx`: verified all 4 clips build to non-empty
+    `AudioStreamWAV` data and `Sfx.play("hit")` does not error.
+  - Enrage logic: unit-tested `_choose_enemy_skill_id()` directly
+    against a standalone `BattleManager` instance — confirmed turn 1
+    (odd) picks no skill, turn 2 (even) picks Ashfall, and once HP is
+    dropped to 40% the very next call (an odd turn, which would
+    normally mean no skill) instead returns Cinderquake with
+    `_just_enraged == true`, and a subsequent even turn stays on
+    Cinderquake with `_just_enraged` correctly cleared.
+  - Ambience: loaded Cinderfall Woods, a generated dungeon (tier 3,
+    level 4), and the Red Gate headlessly with no script errors, then
+    captured an Xvfb + Mesa llvmpipe screenshot of Cinderfall Woods
+    confirming the dim tint and the player's light glow render
+    correctly (shown to the project owner).
+  - Balance sweep numbers (starter gear: Rusted Shortsword + Traveler's
+    Vest):
+
+    | Level | Enemy | Player deals/hit | Hits to kill enemy | Enemy deals/hit | Hits to kill player |
+    |---|---|---|---|---|---|
+    | 1 | Ember Wisp | 11 | 2 | 3 | 9 |
+    | 1 | Bramble Husk | 10 | 2 | 5 | 5 |
+    | 2 | Ember Wisp | 13 | 2 | 4 | 8 |
+    | 2 | Bramble Husk | 12 | 3 | 7 | 5 |
+    | 3 | Ember Wisp | 14 | 2 | 6 | 6 |
+    | 3 | Bramble Husk | 13 | 3 | 8 | 5 |
+    | 4 | Ember Wisp | 16 | 2 | 7 | 6 |
+    | 4 | Bramble Husk | 15 | 3 | 10 | 4 |
+
+- A full headless smoke run (`godot4 --headless --path . --quit-after 10`)
+  passed cleanly after all changes, including the new `Sfx` autoload
+  (required a class-cache rebuild pass first — the same
+  `godot4 --headless --editor --quit --path .` step every prior phase
+  needed after adding new `class_name` scripts).
+
+KNOWN ISSUES:
+- Headless runs have no audio output device (fall back to Godot's dummy
+  audio driver) and this sandbox cannot play sound for a human either —
+  `Sfx.play()` is verified to build valid streams and not error, but
+  what it actually sounds like is unverified. A human should listen in
+  the editor before calling audio "done."
+- The enrage mechanic and hit-flash/shake are logic- and
+  screenshot-verified, but their *feel* (does the shake read as
+  impactful without being annoying, is 50% the right enrage threshold)
+  needs an actual playtest, per every prior phase's same caveat about
+  this sandbox having no way to simulate real input/timing feel.
+- Presentation is still solid-color placeholder tiles underneath the
+  new lighting — the lighting makes them read better, but this is not
+  the parallax/depth-layering art pass GAME_DESIGN.md Section 2
+  ultimately calls for.
+- As requested by the project owner in a much earlier turn, art is
+  still explicitly a later concern; Phase 6 deliberately spent its
+  "polish" budget on lighting/audio/feedback systems that generalize
+  across every current and future map, rather than on one-off sprite
+  work.
+
+FOLLOW-UP:
+- This was CLAUDE.md's last explicitly-defined phase. Per the Phase 5
+  entry's own note, this is a natural point for a deliberate check-in
+  with the project owner on what "expand the game" (CLAUDE.md Section
+  23) should mean next — more content within existing systems (more
+  enemies/gear/gate words) vs. new systems (a second Reach, a proper
+  class/build system, a real art pass), rather than continuing to
+  assume the next phase's shape.
+- If a human playtest disagrees with the 50% enrage threshold or the
+  shake/flash intensity, both are single tunable values
+  (`EnemyData.enrage_threshold`, the `strength` args in
+  `battle_ui.gd`'s `_shake()` calls).
+
+---
+
 ## 2026-09-15 — Systems-depth pass: stats, abilities, movesets (post-Phase-5)
 
 STATUS: COMPLETE

@@ -204,6 +204,16 @@ every valid combination now producing *something*, a second hand-built
 - Not a recolor of the normal maps — its own tileset color, its own
   hand-placed layout, not the generation system used elsewhere
 
+### Presentation (Phase 6)
+
+Every dungeon (Cinderfall Woods, every generated dungeon, and the Red
+Gate) is now dimmed with a soft light following the player, so
+exploring reads as tenser/darker than Waymark's bright safe hub — a
+lighting cue built entirely from engine primitives (no new art assets;
+see ARCHITECTURE.md Section 7b). Town is intentionally left fully lit.
+This is the first "elevation/lighting cue" from Section 2's genre list
+to actually ship; full parallax/depth layering is still future work.
+
 ## 8. Gate Discovery
 
 The prototype needs 2–4 sources, each revealing a fragment of the Red
@@ -256,6 +266,17 @@ expected to gear up (e.g. Traveler's Vest for +5 HP/+3 Defense) before
 attempting the Red Gate. Noted here per Section 27's "measure then
 adjust" philosophy rather than tuned away.
 
+### Combat feedback & sound (Phase 6)
+
+Hits now land with a screen-tint flash, a short screen shake, and a
+sound cue; victory, defeat, and fleeing each get their own short
+jingle. Every sound is synthesized at runtime rather than a recorded
+audio file — this sandbox has no way to source or license real audio
+assets, so a short procedural tone stands in, the same way a ColorRect
+stands in for real tile art (see ARCHITECTURE.md Section 8a). It is
+built to be swapped for real SFX later without changing anything that
+calls it.
+
 ### Weapon movesets (systems-depth pass, post-Phase-5)
 
 Weapons can grant an extra Skill only usable while that weapon is
@@ -267,12 +288,24 @@ This makes gear a build choice beyond raw stat totals — switching
 weapons changes what moves are available, not just the numbers behind
 Basic Attack.
 
+### Enemy AI & boss mechanics (Phase 6)
+
+Every enemy alternates basic attack and its one skill turn-to-turn
+instead of spamming the skill every time (the previous behavior for
+every enemy in the game). The **Ashen Warden** additionally **enrages**
+at 50% HP: it permanently switches to **Cinderquake** (power 24, its
+strongest attack, versus Ashfall's 14) for the rest of the fight, with
+a one-time "The Ashen Warden's flames roar higher!" warning. This turns
+the fight into two phases — survive the opening exchanges, then weather
+a harder back half — without needing a full scripted-phase boss AI
+framework the prototype's single boss doesn't justify yet.
+
 ### Enemies (prototype set)
 - Ember Wisp (common — Cinderfall Woods, and reused at scaled level/stats
   in every generated dungeon; see Section 6's word-driven generation)
 - Bramble Husk (common — same reuse as Ember Wisp)
 - Cinder Wraith (Cinderfall Woods mini-boss, drops a Gate clue)
-- **Ashen Warden** (Red Gate boss)
+- **Ashen Warden** (Red Gate boss — the only enemy with an enrage phase)
 
 Tideling and Hollow Stalker were originally planned as Silent Marsh's
 enemies; since Silent Marsh as a distinct hand-authored map is

@@ -2,6 +2,37 @@
 
 Owner: Agent 9 (QA)
 
+## Exit criteria for Phase 6 (Boss + Polish) — manual, needs a display
+
+Not yet run against this build.
+
+- [ ] Fighting any common enemy (Ember Wisp/Bramble Husk), its first
+      turn is a basic attack, its second turn uses its skill, and it
+      keeps alternating — it no longer uses the same skill every turn.
+- [ ] Fighting the Ashen Warden down to roughly half HP triggers "The
+      Ashen Warden's flames roar higher!" exactly once, and every one
+      of its attacks afterward is Cinderquake (not Ashfall, not a
+      basic attack) for the rest of the fight.
+- [ ] Every hit (player's or the enemy's) produces a visible screen
+      tint flash and a brief screen shake; the shake never leaves
+      command buttons visibly misaligned or unclickable afterward.
+- [ ] A hit, a victory, a defeat, and a fled battle each play a
+      distinct short sound (even if simple/synthesized, not silence).
+- [ ] Sound doesn't stutter or cut off oddly when two hits land in
+      quick succession (e.g. a skill that also triggers a family-bonus
+      recalculation).
+- [ ] Walking through Cinderfall Woods, a generated dungeon, and the
+      Red Gate all look visibly dimmer than Waymark, with a soft light
+      following the player as they move; Waymark itself stays fully
+      bright with no light attached to the player there.
+- [ ] The lighting doesn't obscure obstacle tiles, encounter markers,
+      or doorways to the point they're unreadable.
+- [ ] No script errors appear in the console across a full loop:
+      fight several common enemies (confirm attack/skill alternation),
+      fight the Ashen Warden to its enrage point and past it, and walk
+      through at least one generated dungeon and Cinderfall Woods to
+      confirm the ambience renders in both.
+
 ## Exit criteria for the systems-depth pass (post-Phase-5) — manual, needs a display
 
 Not yet run against this build.

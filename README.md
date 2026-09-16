@@ -8,9 +8,8 @@ Not an MMO. No accounts, no live service, no persistent online world.
 
 ## Status
 
-Phase 5 (Gates) complete, plus a post-Phase-5 systems-depth pass
-(mitigation-based damage, speed initiative, weapon movesets,
-level-gated gear). See `docs/PROGRESS.md`.
+Phase 6 (Boss + Polish) complete — the last CLAUDE.md-defined phase.
+See `docs/PROGRESS.md`.
 
 ## Controls
 
@@ -67,6 +66,15 @@ Attack, and whichever side is faster (Speed) opens the battle. Some
 weapons also have their own moveset — the Cinderfall Cleaver grants
 **Cleave** and Cindermourn grants **Ashbrand**, each usable from the
 Skill submenu only while that weapon is equipped.
+
+Enemies no longer spam the same skill every turn — they alternate
+basic attack and skill. The Ashen Warden **enrages at 50% HP**,
+switching permanently to its stronger Cinderquake for the rest of the
+fight. Every hit now has a screen-flash/shake and a sound cue (a
+synthesized placeholder tone — this sandbox can't source real audio
+assets, see `docs/ARCHITECTURE.md` Section 8a), and every dungeon is
+dimmed with a soft light following the player, while Waymark stays
+fully lit.
 
 All tile art is deliberately placeholder (solid-color squares) — see
 `docs/GAME_DESIGN.md` Section 7 on art direction.

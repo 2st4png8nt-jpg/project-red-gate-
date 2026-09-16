@@ -32,4 +32,5 @@ func _ready() -> void:
 	player.position = player_spawn.position
 	add_child(player)
 	player.set_camera_limits(Rect2i(Vector2i.ZERO, MAP_SIZE * TILE_SIZE))
+	DungeonAmbience.apply(self, player)
 	print("[CinderfallWoods] loaded. current_map_id=%s" % GameState.current_map_id)
