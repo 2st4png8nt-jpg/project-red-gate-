@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "ashen_warden_encounter"
-enemy_id = "ashen_warden"
+enemy_ids = Array[String](["ashen_warden"])
 can_flee = false
 level = 1
 loot_table_id_override = ""

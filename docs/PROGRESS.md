@@ -7,6 +7,153 @@ Section 28).
 
 ---
 
+## 2026-09-16 — Depth pass: monster packs, bigger dungeons, loot chests, Gate preview
+
+STATUS: COMPLETE
+
+Direct response to the project owner's first real playtest feedback on
+an actual exported build: level design felt flat (2-3 monsters per
+level, sometimes plain empty), no visible loot chests, and no
+information about a Gate's contents (monster type, level) before
+committing to open it. Asked explicitly to "think depth like the .hack
+trilogy — original dungeon size and monster packs." This is the
+largest single architecture change since Phase 5 — combat had to grow
+from "one enemy" to "a pack of enemies" everywhere.
+
+IMPLEMENTED:
+- **Monster packs**: `EncounterData.enemy_id: String` -> `enemy_ids:
+  Array[String]` (1 = solo boss/miniboss, 2-3 = a pack). `BattleManager`
+  rewritten around parallel `enemies`/`enemy_hps` arrays: targeted
+  Attack/single-target Skills, a new `all_enemies` skill target type
+  (finally used — the schema has supported it since Phase 2 and nothing
+  ever built one), aggregated XP/gold with one loot roll per battle
+  (not one per enemy, to avoid packs being strictly better farming than
+  an equivalent-difficulty solo fight), and per-pack-member turns.
+- **New AoE skill**: `Blazing Arc` (mp_cost 7, power 7, `all_enemies`)
+  fills the 5th universal-ability slot reserved since Phase 2, giving
+  players a real answer to a pack instead of only ever single-targeting.
+- **BattleUI multi-enemy display**: the old fixed `EnemyName`/`EnemyHP`
+  labels became a dynamic `EnemyList` (one row per pack member, greyed
+  out once defeated) plus a `TargetMenu` submenu that only appears when
+  more than one enemy is alive — a solo fight (most bosses) is
+  completely unchanged, zero extra clicks.
+- **Bigger dungeons**: every `GeneratedDungeon` tier's map size and
+  encounter count grew substantially (tier 0: `14x9`/1 encounter ->
+  `22x11`/2; tier 3: `24x15`/4 -> `40x17`/7), each encounter now a pack.
+  Cinderfall Woods enlarged `20x11` -> `30x16` with a new second branch,
+  its 2 solo trash-mob encounters replaced by 5 pack encounters.
+- **World loot chests**: `LootChest`, a visible, one-shot, walk-up loot
+  source (distinct from post-battle loot) using `drop_chance = 1.0`
+  tables so a chest always yields something. 1-2 per generated-dungeon
+  tier (none at tier 0), 1 in Cinderfall Woods' new south branch.
+- **Gate preview**: once all 3 words are chosen, `GateUI` now shows
+  what a `GENERATED` result actually contains (level, size, likely
+  monster names) by calling `GateResolver.resolve()` speculatively —
+  it's a pure query, safe before committing. `KNOWN`/`SPECIAL` results
+  (Cinderfall Woods, the Red Gate) get a short evocative line instead,
+  keeping their hand-designed reveals intact.
+
+FILES CHANGED:
+- New: `data/skills/blazing_arc.tres`, `scripts/world/loot_chest.gd`,
+  `scenes/world/props/LootChest.tscn`,
+  `data/loot/{cinderfall_chest_loot,generated_chest_loot}.tres`,
+  `data/encounters/cinderfall_pack_{embers,mixed,thorns}.tres`,
+  `data/encounters/cinderfall_{branch_pack,chest_guard}.tres`.
+- Deleted: `data/encounters/{ember_wisp,bramble_husk}_encounter.tres`
+  (fully superseded by the new pack rows, no back-compat shim).
+- Rewritten: `scripts/combat/battle_manager.gd` (pack architecture),
+  `scripts/ui/battle_ui.gd` (multi-enemy display/targeting),
+  `scripts/world/generated_dungeon.gd` (bigger tiers, chests),
+  `scripts/world/cinderfall_woods.gd` (enlarged map, new branch).
+- Modified: `scripts/data/encounter_data.gd` (`enemy_ids`),
+  `scripts/world/generated_encounter_trigger.gd` (`enemy_pool` +
+  pack sampling), `scripts/combat/combat_math.gd` (`pack_scale()`),
+  `scripts/ui/gate_ui.gd` + `scenes/ui/GateUI.tscn` (preview),
+  `data/encounters/{ashen_warden,cinder_wraith}_encounter.tres`
+  (migrated to `enemy_ids`).
+
+INTERFACES CHANGED:
+- `EncounterData.enemy_id: String` removed; `enemy_ids: Array[String]`
+  added. Every reader and every row migrated together — no dual-format
+  compatibility path.
+- `BattleManager.enemy`/`enemy_hp` (single) removed; `enemies`/
+  `enemy_hps` (parallel arrays) added. `player_attack()`/
+  `player_use_skill()` gained a `target_index` parameter.
+  `alive_enemy_indices()` and `enemy_names_summary()` are new public
+  query helpers for UI.
+- `GeneratedEncounterTrigger.enemy_ids` renamed to `enemy_pool`; gained
+  `pack_size_min`/`pack_size_max` (default 2/3).
+- `CombatMath` gained `pack_scale(dmg, pack_size)`.
+- `SkillData.target_type == "all_enemies"` now has a real implementation
+  in `BattleManager.player_use_skill()` (previously documented in the
+  schema, never built).
+
+TESTS:
+- Headless self-tests (temporary code in `boot.gd`/`battle_ui.gd`,
+  reverted after, confirmed via `git diff --stat` showing no changes):
+  - Pack battle end-to-end: a 3-enemy pack (Ember Wisp, Ember Wisp,
+    Bramble Husk) loaded correctly, `enemy_names_summary()` collapsed
+    duplicates ("Ember Wisp x2, Bramble Husk"), a targeted attack on
+    index 0 changed only that enemy's HP (verified indices 1/2
+    untouched), and Blazing Arc reduced every alive enemy's HP.
+  - Reachability: extended the existing BFS self-test to Cinderfall
+    Woods' new 30x16 layout (151 open tiles, all reachable, both
+    branches and the chest verified) and to all 4 `GeneratedDungeon`
+    tiers at their new sizes (61/103/163/207 open tiles respectively,
+    all fully connected, every encounter and chest tile verified).
+  - Gate preview: exercised all 4 `GateResolver` result types directly
+    against `GateUI._update_preview()`, confirming the expected text
+    for `KNOWN` (Cinderfall Woods), `SPECIAL` (Red Gate), and
+    `GENERATED` (exact level/size/monster-name text for
+    `Drowned+Undying+Umbra`).
+  - Ashen Warden (`ashen_warden_encounter.tres`, now `enemy_ids`) loaded
+    and started correctly through the unchanged file-based
+    `start_battle()` path, confirming the solo-boss case survived the
+    schema migration intact.
+- A full headless smoke run passed cleanly after every change; the
+  usual class-cache rebuild pass was needed after each new
+  `class_name` script.
+
+KNOWN ISSUES (real balance finding, not a bug):
+- The first pack self-test run — a full-strength 3-enemy pack acting
+  every turn against a well-armored level-1 test player — nearly
+  ended in defeat within 2 rounds, because every pack member acted
+  every turn with no individual damage reduction (every member reused
+  its exact solo stat block) and, worse, all 3 synchronized onto their
+  stronger skill on the same turn (they shared one turn counter).
+  Fixed two ways, both recorded in AGENT_CONTRACTS.md's decision log:
+  `CombatMath.pack_scale()` dampens each member's outgoing hit by pack
+  size (100%/85%/70%), and `_choose_enemy_skill_id()` now offsets the
+  attack/skill alternation by pack index so members stagger instead of
+  spiking together. Re-tested afterward: the same player survived the
+  full fight with sensible play (healing when low).
+- As with every prior phase, only headless logic validation and
+  screenshots were possible — no real interactive playtest of pack
+  fight *pacing* (does watching 3 enemies each take a turn feel slow),
+  the new dungeons' *feel* while walking them, or whether the pack
+  damage-scaling percentages (100/85/70) are tuned right. These are
+  exactly the follow-up questions for the project owner's next
+  playtest pass.
+- `LootChest` does not persist "already opened" across leaving and
+  re-entering a map, matching every other trigger in the project (no
+  encounter/chest state is saved to `GameState`) — a return visit
+  re-opens an already-looted chest for its (now-dimmed) marker. Not
+  considered a bug for this prototype's scope; would need real save
+  state to fix properly.
+
+FOLLOW-UP:
+- This is the second real bug/balance signal found only by an actual
+  human playing an actual build — validates that ongoing playtesting,
+  not just headless self-tests, needs to stay part of the loop for any
+  future work.
+- If pack pacing feels slow with 3 enemies each taking a visible turn,
+  the per-hit delay (`_enemy_turn()`'s 0.5s pause between pack members)
+  is a single tunable value.
+- If `PACK_DAMAGE_FACTOR` (100/85/70%) feels off in either direction
+  after real play, it's a single dictionary in `CombatMath`.
+
+---
+
 ## 2026-09-16 — Bug fix: Gate system was completely broken in exported builds
 
 STATUS: COMPLETE

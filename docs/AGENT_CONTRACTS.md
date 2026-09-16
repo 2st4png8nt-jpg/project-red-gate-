@@ -129,6 +129,33 @@ Delivered in Phase 6 (Boss + Polish):
   alongside existing damage calculations — pure telemetry for Agent 5's
   hit-flash/shake, no new math.
 
+Delivered in the depth pass (post-Phase-6, playtest feedback: dungeons
+felt flat/empty, no monster packs, no visible loot, no info before
+committing to a Gate):
+- `BattleManager` rewritten for **packs**: `enemy`/`enemy_hp` (single)
+  became `enemies`/`enemy_hps` (parallel arrays). `player_attack()`/
+  `player_use_skill()` take a `target_index`; `alive_enemy_indices()`
+  and `enemy_names_summary()` are new query helpers for Agent 5's UI.
+  `_win()` aggregates XP/gold across the whole pack and rolls loot
+  once (not once per enemy). `_enemy_turn()` loops every living pack
+  member, each acting once, with a short pause between hits so
+  multi-enemy turns read individually rather than as one damage blob.
+- New `SkillData.target_type == "all_enemies"` support — `blazing_arc.tres`
+  (mp_cost 7, power 7, element ember) is the first skill to use it,
+  giving the player 3 universal skills a real answer to a pack instead
+  of only ever picking a single target.
+- `CombatMath.pack_scale(dmg, pack_size)` — 100%/85%/70% for a
+  1/2/3-enemy pack. Added after a pack self-test showed every member
+  acting every turn made total pack damage scale ~linearly with
+  headcount, occasionally exceeding a solo boss's output; every pack
+  member still reuses the exact same `EnemyData` stat block as its
+  solo appearances; this scales only outgoing damage, not HP/defense/
+  rewards. See ARCHITECTURE.md Section 6.
+- `_choose_enemy_skill_id(index)` offsets the skill-alternation check by
+  pack index so members stagger instead of every one synchronizing onto
+  its stronger skill the same turn (found via the same self-test, before
+  the damage-scaling fix even helped) — see ARCHITECTURE.md Section 6d.
+
 ## AGENT 3 — RPG / Gear
 
 Owns: `scripts/rpg/`, `data/items/`, `data/characters/`.
@@ -313,6 +340,29 @@ Delivered in the content-expansion pass (post-Phase-6):
   always the same duo; every other origin (including Frost/Storm)
   still falls back to the original pool.
 
+Delivered in the depth pass (post-Phase-6, playtest feedback: dungeons
+felt flat/empty and had no monster packs or visible loot):
+- Every `GeneratedDungeon` tier's map size, corridor length, and
+  encounter-marker count grew substantially (tier 0: `14x9`/1 encounter
+  -> `22x11`/2; tier 3: `24x15`/4 -> `40x17`/7), plus 1-2 new
+  `LootChest` instances per tier (none at tier 0) in side branches.
+  Every tile's reachability was re-verified with the same BFS
+  self-test technique as before, extended to cover chest tiles too.
+- `GeneratedEncounterTrigger.enemy_ids` renamed to `enemy_pool` and now
+  samples `pack_size_min`..`pack_size_max` (default 2-3) times with
+  repetition to build the actual pack, instead of always spawning
+  exactly 1 enemy — see ARCHITECTURE.md Section 7a.
+- Cinderfall Woods enlarged `20x11` -> `30x16`: the north branch (Cinder
+  Wraith) kept, a new south branch added (a `LootChest`), and the two
+  solo trash-mob encounters replaced by 5 hand-authored pack encounters
+  (2 Ember Wisp / mixed / 2 Bramble Husk along the corridor, one more
+  guarding each branch). Re-verified reachable with the same BFS
+  self-test used since Phase 1.
+- New `LootChest` (`scripts/world/loot_chest.gd` +
+  `scenes/world/props/LootChest.tscn`) — a visible, one-shot,
+  walk-up loot source distinct from post-battle loot; see
+  ARCHITECTURE.md Section 6b for why chest tables use `drop_chance = 1.0`.
+
 ## AGENT 5 — UI / UX
 
 Owns: `scripts/ui/`, `scenes/ui/`.
@@ -378,6 +428,21 @@ Delivered in Phase 6 (Boss + Polish):
   `_on_battle_fled` likewise gained `Sfx.play("victory"/"defeat"/"flee")`
   calls. UI still computes no damage numbers — it only reacts to
   signals BattleManager already emits.
+
+Delivered in the depth pass (post-Phase-6, playtest feedback):
+- `BattleUI`'s fixed `EnemyName`/`EnemyHP` labels became a dynamic
+  `EnemyList` (one row per pack member, greyed out and marked
+  "defeated" once dead) — see ARCHITECTURE.md Section 6. A new
+  `TargetMenu` submenu (same dynamic-button-list pattern as the
+  existing Skill submenu) appears only when more than one enemy is
+  alive and the player Attacks or uses a `single_enemy` Skill; with
+  exactly one alive, targeting resolves automatically with zero extra
+  clicks, so a solo boss fight is unchanged from before.
+- `GateUI` gained `_update_preview()` (Section 7c) — connects
+  `item_selected` on all 3 `OptionButton`s, calls `GateResolver.resolve()`
+  speculatively, and shows the result in a new `PreviewLabel`. No new
+  gameplay logic, purely reads existing pure functions before the
+  player commits.
 
 ## AGENT 6 — Enemy / Content
 
@@ -472,6 +537,24 @@ rather than leaving it empty, in case that ever changes.
 `generated_low_loot`/`generated_mid_loot`/`generated_high_loot` each
 gained new items (Agent 3's new gear) at modest weights alongside their
 existing entries — see GAME_DESIGN.md Section 11 for the full table.
+
+Delivered in the depth pass (post-Phase-6, playtest feedback):
+- Cinderfall Woods' two solo trash-mob `EncounterData` rows
+  (`ember_wisp_encounter.tres`, `bramble_husk_encounter.tres`) deleted
+  outright — no back-compat shim, both were fully superseded — and
+  replaced with 5 pack rows: `cinderfall_pack_embers` (2x Ember Wisp),
+  `cinderfall_pack_mixed` (Ember Wisp + Bramble Husk),
+  `cinderfall_pack_thorns` (2x Bramble Husk), `cinderfall_branch_pack`
+  (guards the Cinder Wraith branch), `cinderfall_chest_guard` (guards
+  the new south-branch chest). `ashen_warden_encounter.tres` and
+  `cinder_wraith_encounter.tres` migrated to the new `enemy_ids: Array`
+  field (both stay 1-element solo rows — bosses/minibosses don't
+  become packs).
+- Two new `LootTableData` rows, both `drop_chance = 1.0` so Agent 4's
+  `LootChest` always yields something: `cinderfall_chest_loot.tres`
+  (Iron Buckler / Windward Ring) and `generated_chest_loot.tres`
+  (Ember Draught / Windward Ring / Iron Buckler), the latter shared
+  across every generated-dungeon chest regardless of tier.
 
 ## AGENT 7 — Art / Presentation
 
@@ -610,7 +693,13 @@ See Agent 3 section above for the full field list.
 
 ### `EncounterData` (scripts/data/encounter_data.gd) — added Phase 2
 - `id: String`
-- `enemy_id: String`
+- `enemy_ids: Array[String]` — **breaking rename from `enemy_id: String`,
+  depth pass (post-Phase-6)**; 1 entry = a solo boss/miniboss fight,
+  2-3 = a pack. Every hand-authored `data/encounters/*.tres` row was
+  migrated (bosses/minibosses to a 1-element array, the old solo trash
+  mobs replaced by new pack rows entirely) — no dual-format
+  compatibility shim, since every reader and every row changed together
+  in the same pass.
 - `can_flee: bool`
 - `level: int` — added Phase 5; scales the enemy via `EnemyScaler`. Defaults to
   1 (no change) — every hand-authored Phase 2-4 row is unaffected.
@@ -785,3 +874,32 @@ re-litigates it (CLAUDE.md Section 19).
   cap — recorded here rather than silently exceeding it — not a full
   "unique monsters per Origin" system, which would be 6 more enemies
   for marginal payoff at this stage.
+- **2026-09-16 (depth pass)** — Decided pack members reuse their exact
+  solo `EnemyData` stat block, with outgoing damage dampened by
+  `CombatMath.pack_scale()`, rather than authoring separate weaker
+  "pack variant" enemies. Keeps exactly one `EnemyData` row per monster
+  (no `ember_wisp_pack` duplicate to keep in sync with the original),
+  and the dampening factor is a single tunable table
+  (`PACK_DAMAGE_FACTOR`) if playtesting says 2/3-enemy packs still hit
+  too hard or too soft. Found necessary — not designed up front — via
+  a pack self-test where 3 full-strength enemies acting every turn
+  nearly killed a well-armored level-1 test player within 2 rounds.
+- **2026-09-16 (depth pass)** — Decided `_win()` rolls loot exactly
+  once per battle regardless of pack size (using the first pack member
+  with a non-empty `loot_table_id`, or the encounter's override),
+  rather than once per defeated enemy. A 3-enemy pack rolling 3
+  independent items would make packs strictly better farming than a
+  solo fight of equivalent difficulty, and would spam the victory
+  message/inventory. XP and gold still sum across the whole pack, since
+  more enemies defeated *should* mean more experience/currency — only
+  the loot roll is capped at one to avoid the farming incentive.
+- **2026-09-16 (depth pass)** — Decided the Gate preview (Section 7c)
+  shows the full generated breakdown (level, size, likely monsters) for
+  `GENERATED` results but only a short evocative line for `KNOWN`/
+  `SPECIAL` ones, rather than a uniform level of detail everywhere.
+  `KNOWN`/`SPECIAL` are the two hand-designed, one-off destinations
+  (Cinderfall Woods, the Red Gate); a full breakdown for them would
+  either restate what a returning player already knows or spoil the
+  Red Gate's reveal for a new one. The playtest complaint was about
+  *generated* dungeons being a total mystery before committing, which
+  is the case this preview actually needed to solve.

@@ -4,10 +4,24 @@ extends CanvasLayer
 # the player pick one word per category, then resolves via GateResolver.
 # Contains no dungeon-generation logic itself — see ARCHITECTURE.md
 # Section 7/7a.
+#
+# Depth pass (post-Phase-6): once all 3 words are chosen, a preview
+# shows what a GENERATED result would actually contain (level, likely
+# monsters, dungeon size) before the player commits — calling
+# GateResolver.resolve() speculatively is safe since it's a pure query,
+# no state changes. KNOWN/SPECIAL results get an evocative line instead
+# of the full generated breakdown, since those are fixed, designed
+# destinations rather than formula output — the point of the preview is
+# informed choice about generated dungeons, not spoiling the two
+# hand-crafted ones.
+
+const GENERATED_DUNGEON_SCRIPT := preload("res://scripts/world/generated_dungeon.gd")
+const SIZE_DESCRIPTIONS := ["a small chamber", "a modest passage", "a sprawling hall", "a vast, branching complex"]
 
 @onready var origin_option: OptionButton = $Root/OriginOption
 @onready var tone_option: OptionButton = $Root/ToneOption
 @onready var sign_option: OptionButton = $Root/SignOption
+@onready var preview_label: Label = $Root/PreviewLabel
 @onready var open_button: Button = $Root/OpenButton
 @onready var close_button: Button = $Root/CloseButton
 @onready var message_label: Label = $Root/MessageLabel
@@ -17,6 +31,9 @@ func _ready() -> void:
 	_populate_option(origin_option, "origin")
 	_populate_option(tone_option, "tone")
 	_populate_option(sign_option, "sign")
+	origin_option.item_selected.connect(func(_index): _update_preview())
+	tone_option.item_selected.connect(func(_index): _update_preview())
+	sign_option.item_selected.connect(func(_index): _update_preview())
 	open_button.pressed.connect(_on_open_pressed)
 	close_button.pressed.connect(func(): hide())
 	visibility_changed.connect(_on_visibility_changed)
@@ -24,7 +41,36 @@ func _ready() -> void:
 func _on_visibility_changed() -> void:
 	if visible:
 		message_label.text = "Choose a word for each — Origin, Tone, Sign — and open the Gate."
+		preview_label.text = ""
 		_refresh_clues()
+
+func _update_preview() -> void:
+	if origin_option.selected <= 0 or tone_option.selected <= 0 or sign_option.selected <= 0:
+		preview_label.text = ""
+		return
+	var origin := origin_option.get_item_text(origin_option.selected)
+	var tone := tone_option.get_item_text(tone_option.selected)
+	var sign := sign_option.get_item_text(sign_option.selected)
+	var result := GateResolver.resolve(origin, tone, sign)
+	match result.type:
+		GateResolver.ResultType.INVALID:
+			preview_label.text = "The Gate stays dark. These words don't seem to belong together."
+		GateResolver.ResultType.KNOWN:
+			preview_label.text = "The scholars have charted this combination — a known place awaits."
+		GateResolver.ResultType.SPECIAL:
+			preview_label.text = "The arch resists these words... something waits that shouldn't."
+		GateResolver.ResultType.GENERATED:
+			var profile: DungeonProfile = result.dungeon_profile
+			var enemy_pool: Array = GENERATED_DUNGEON_SCRIPT.ORIGIN_ENEMY_POOL.get(origin, GENERATED_DUNGEON_SCRIPT.DEFAULT_ENEMY_POOL)
+			var enemy_names: Array[String] = []
+			for enemy_id in enemy_pool:
+				var enemy: EnemyData = DataLoader.load_resource("res://data/enemies/%s.tres" % enemy_id)
+				if enemy != null and not enemy_names.has(enemy.display_name):
+					enemy_names.append(enemy.display_name)
+			var size_desc: String = SIZE_DESCRIPTIONS[profile.branch_tier]
+			preview_label.text = "Sensed beyond the Gate:\nLevel %d — %s\nLikely to encounter: %s" % [
+				profile.level, size_desc, ", ".join(enemy_names)
+			]
 
 func _populate_option(option: OptionButton, category: String) -> void:
 	option.clear()

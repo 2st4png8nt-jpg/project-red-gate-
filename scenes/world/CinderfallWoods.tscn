@@ -1,9 +1,10 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/cinderfall_woods.gd" id="1"]
 [ext_resource type="TileSet" path="res://art/tiles/world_tileset.tres" id="2"]
 [ext_resource type="Script" path="res://scripts/world/map_transition_area.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/world/encounter_trigger.gd" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/world/props/LootChest.tscn" id="5"]
 
 [sub_resource type="RectangleShape2D" id="RectShape_door"]
 size = Vector2(32, 32)
@@ -20,10 +21,10 @@ tile_set = ExtResource("2")
 [node name="Obstacles" type="Node2D" parent="."]
 
 [node name="PlayerSpawn" type="Marker2D" parent="."]
-position = Vector2(80, 176)
+position = Vector2(80, 272)
 
 [node name="ToWaymark" type="Area2D" parent="."]
-position = Vector2(16, 176)
+position = Vector2(16, 272)
 collision_layer = 0
 collision_mask = 2
 script = ExtResource("3")
@@ -43,38 +44,79 @@ label_settings = SubResource("LabelSettings_title")
 [node name="BranchLabel" type="Label" parent="."]
 offset_left = 224.0
 offset_top = 28.0
-offset_right = 400.0
+offset_right = 420.0
 offset_bottom = 60.0
 text = "a side path leads north"
 
-[node name="EncounterEmberWisp" type="Area2D" parent="."]
-position = Vector2(400, 176)
+[node name="BranchLabelSouth" type="Label" parent="."]
+offset_left = 224.0
+offset_top = 52.0
+offset_right = 440.0
+offset_bottom = 84.0
+text = "a hidden cache lies south"
+
+[node name="EncounterPackEmbers" type="Area2D" parent="."]
+position = Vector2(208, 272)
 collision_layer = 0
 collision_mask = 2
 script = ExtResource("4")
-encounter_id = "ember_wisp_encounter"
+encounter_id = "cinderfall_pack_embers"
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="EncounterEmberWisp"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="EncounterPackEmbers"]
 shape = SubResource("RectShape_door")
 
-[node name="Marker" type="ColorRect" parent="EncounterEmberWisp"]
+[node name="Marker" type="ColorRect" parent="EncounterPackEmbers"]
 offset_left = -6.0
 offset_top = -6.0
 offset_right = 6.0
 offset_bottom = 6.0
 color = Color(0.9, 0.55, 0.1, 1)
 
-[node name="EncounterBrambleHusk" type="Area2D" parent="."]
-position = Vector2(528, 176)
+[node name="EncounterPackMixed" type="Area2D" parent="."]
+position = Vector2(464, 272)
 collision_layer = 0
 collision_mask = 2
 script = ExtResource("4")
-encounter_id = "bramble_husk_encounter"
+encounter_id = "cinderfall_pack_mixed"
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="EncounterBrambleHusk"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="EncounterPackMixed"]
 shape = SubResource("RectShape_door")
 
-[node name="Marker" type="ColorRect" parent="EncounterBrambleHusk"]
+[node name="Marker" type="ColorRect" parent="EncounterPackMixed"]
+offset_left = -6.0
+offset_top = -6.0
+offset_right = 6.0
+offset_bottom = 6.0
+color = Color(0.9, 0.55, 0.1, 1)
+
+[node name="EncounterPackThorns" type="Area2D" parent="."]
+position = Vector2(720, 272)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("4")
+encounter_id = "cinderfall_pack_thorns"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="EncounterPackThorns"]
+shape = SubResource("RectShape_door")
+
+[node name="Marker" type="ColorRect" parent="EncounterPackThorns"]
+offset_left = -6.0
+offset_top = -6.0
+offset_right = 6.0
+offset_bottom = 6.0
+color = Color(0.9, 0.55, 0.1, 1)
+
+[node name="EncounterBranchGuard" type="Area2D" parent="."]
+position = Vector2(400, 176)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("4")
+encounter_id = "cinderfall_branch_pack"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="EncounterBranchGuard"]
+shape = SubResource("RectShape_door")
+
+[node name="Marker" type="ColorRect" parent="EncounterBranchGuard"]
 offset_left = -6.0
 offset_top = -6.0
 offset_right = 6.0
@@ -82,7 +124,7 @@ offset_bottom = 6.0
 color = Color(0.9, 0.55, 0.1, 1)
 
 [node name="EncounterCinderWraith" type="Area2D" parent="."]
-position = Vector2(304, 80)
+position = Vector2(400, 80)
 collision_layer = 0
 collision_mask = 2
 script = ExtResource("4")
@@ -97,3 +139,24 @@ offset_top = -8.0
 offset_right = 8.0
 offset_bottom = 8.0
 color = Color(0.8, 0.1, 0.1, 1)
+
+[node name="EncounterChestGuard" type="Area2D" parent="."]
+position = Vector2(656, 368)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("4")
+encounter_id = "cinderfall_chest_guard"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="EncounterChestGuard"]
+shape = SubResource("RectShape_door")
+
+[node name="Marker" type="ColorRect" parent="EncounterChestGuard"]
+offset_left = -6.0
+offset_top = -6.0
+offset_right = 6.0
+offset_bottom = 6.0
+color = Color(0.9, 0.55, 0.1, 1)
+
+[node name="LootChest" parent="." instance=ExtResource("5")]
+position = Vector2(656, 432)
+loot_table_id = "cinderfall_chest_loot"

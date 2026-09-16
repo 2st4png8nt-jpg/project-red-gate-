@@ -1,25 +1,29 @@
 extends Node2D
 # Cinderfall Woods — the prototype's first real dungeon (GAME_DESIGN.md
-# Section 7). A main corridor plus one branching alcove (the "bonus
-# loot area" exploration pillar). Reached via a Phase 1 test doorway in
-# Waymark; the real Gate-driven entry point is Phase 5.
+# Section 7). Enlarged in the depth pass (post-Phase-6): a longer main
+# corridor with a north branch (the Cinder Wraith mini-boss) and a new
+# south branch (a loot chest), populated with monster packs instead of
+# solo trash mobs. Reached via a Phase 1 test doorway in Waymark; the
+# real Gate-driven entry point is Phase 5.
 
 const PLAYER_SCENE := preload("res://scenes/world/Player.tscn")
 const OBSTACLE_SCENE := preload("res://scenes/world/props/Obstacle.tscn")
 
 const TILE_SIZE := 32
-const MAP_SIZE := Vector2i(20, 11)
+const MAP_SIZE := Vector2i(30, 16)
 const FOREST_FLOOR_SOURCE_ID := 2
 const DIRT_SOURCE_ID := 1
 
 # Open (walkable) tile rectangles:
 #  - the west doorway threshold, back to Waymark
-#  - the main east-west corridor/clearing
-#  - the north branch alcove (the bonus/side-exploration area)
+#  - the main east-west corridor
+#  - the north branch alcove (the Cinder Wraith mini-boss)
+#  - the south branch alcove (a loot chest — new in the depth pass)
 static var OPEN_RECTS: Array[Rect2i] = [
-	Rect2i(0, 5, 1, 1),
-	Rect2i(1, 4, 18, 3),
-	Rect2i(7, 1, 5, 3),
+	Rect2i(0, 8, 1, 1),
+	Rect2i(1, 7, 28, 3),
+	Rect2i(10, 1, 6, 7),
+	Rect2i(18, 9, 6, 6),
 ]
 
 @onready var ground: TileMapLayer = $Ground

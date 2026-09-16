@@ -147,6 +147,18 @@ Gate resolution logic lives entirely in `/scripts/gates/` (`GateResolver`)
 and reads its known/special rows from `/data/gates/combinations/`. No
 combination is hardcoded into UI, combat, or world scripts.
 
+### Gate preview (depth pass, post-Phase-6)
+
+Choosing 3 words used to be a total blind commitment — no idea what
+level, size, or monsters waited on the other side until you'd already
+opened the Gate. Once all 3 are picked, the Gate UI now shows a
+preview: for a generated result, the real level, a size description,
+and which monsters you're likely to meet; for the Red Gate or
+Cinderfall Woods, a short evocative line instead, so the two hand-built
+destinations keep their mystery rather than being spoiled outright.
+Choosing an invalid combination shows a hint that the words don't fit,
+before you even try to open it.
+
 ### Word-driven generation
 
 Each word category maps onto a different axis of the generated
@@ -178,6 +190,15 @@ level/theme/loot still vary with the words). Fracture reuses Umbra's
 template (tier 3) rather than adding a genuinely new, unverified 5th
 one.
 
+**Scale and packs (depth pass, post-Phase-6):** every tier's map size
+and encounter count grew substantially in response to playtesting —
+dungeons read as flat and empty, with only 1-4 solo enemies to fight
+across an entire run. Tier 0 (small, single room) now has 2 encounters
+where it had 1; tier 3 (largest, most branching) has 7 where it had 4,
+plus 1-2 loot chests per tier (none at tier 0). Each encounter now
+spawns a **pack** of 2-3 enemies rather than always a single one —
+bosses and the Cinder Wraith mini-boss stay solo fights.
+
 ## 7. Maps
 
 ### Town — Waymark
@@ -189,7 +210,10 @@ one.
 ### Cinderfall Woods — the one hand-crafted normal dungeon
 - Reached via `Cinder + Broken + Ember`
 - Early-game enemies, first equipment tier
-- One branching exploration path (a side area with bonus loot)
+- Enlarged in the depth pass (post-Phase-6): two branching exploration
+  paths now — the original north branch leading to the Cinder Wraith
+  mini-boss, and a new south branch holding a loot chest — plus 5
+  monster-pack encounters along the way (up from 3 solo fights)
 - Kept hand-crafted (not generated) specifically so the game's very
   first dungeon has a designed, tested shape rather than a formulaic
   template — see Section 25's discovery→reward→power loop.
@@ -252,6 +276,20 @@ Flow: enter encounter -> show party/enemy state -> choose command ->
 resolve -> show result -> repeat until victory/defeat.
 
 Commands: **Attack, Skill, Item, Defend, Run**.
+
+### Monster packs (depth pass, post-Phase-6)
+
+Most encounters are now against a pack of 2-3 enemies rather than a
+single one — bosses and the Cinder Wraith mini-boss stay solo fights.
+Attacking or using a single-target Skill against more than one living
+enemy opens a target-select menu; with only one enemy left alive,
+targeting happens automatically with no extra click. Every pack member
+still acts on its own turn, but each hits somewhat softer than it would
+solo (100%/85%/70% of its normal damage for a 1/2/3-enemy pack) — the
+same trade-off most JRPGs make so "more enemies" means a longer, more
+chaotic fight rather than proportionally more incoming damage per
+round. Victory rewards (XP, gold) sum across the whole pack; loot still
+rolls only once per battle, not once per enemy.
 
 ### Damage & initiative (systems-depth pass, post-Phase-5)
 
@@ -333,12 +371,14 @@ Ember Wisp/Bramble Husk rather than getting unique monsters, a
 deliberate partial (not full) revision of CLAUDE.md's "3-5 enemy
 types" scope guidance — see AGENT_CONTRACTS.md's decision log.
 
-### Player abilities (prototype set, 3–5)
+### Player abilities (prototype set, 5 — filled out in the depth pass)
 - Basic Attack (free, weapon-scaled)
 - Ember Slash (low MP, single target, fire-flavored)
 - Guard Break (medium MP, bonus vs. defending enemies)
 - Second Wind (MP, self-heal)
-- (5th ability reserved for post-Phase-2 tuning)
+- **Blazing Arc** (medium MP, hits the whole enemy pack at once,
+  fire-flavored) — fills the 5th slot reserved since Phase 2, added
+  specifically to give players a real answer to monster packs
 
 ## 10. Player Progression
 

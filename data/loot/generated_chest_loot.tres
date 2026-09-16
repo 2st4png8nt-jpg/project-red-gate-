@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="LootTableData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/loot_table_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "generated_chest_loot"
+drop_chance = 1.0
+item_ids = Array[String](["ember_draught", "windward_ring", "iron_buckler"])
+weights = Array[int]([2, 1, 1])

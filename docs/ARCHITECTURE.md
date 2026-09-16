@@ -199,13 +199,16 @@ in `_ready()`, then instantiates `Player` at its `PlayerSpawn` marker
 and calls `set_camera_limits()`. Any new map (normal or special) should
 follow this same shape.
 
-## 6. Combat Interface Contract (Phase 2/3 — implemented)
+## 6. Combat Interface Contract (Phase 2/3, packs added in the depth pass post-Phase-6)
 
 Combat (`scripts/combat/battle_manager.gd`, `BattleManager`) consumes,
 not owns:
 - `PlayerData` (`GameState.player` directly — Combat does not copy it)
 - `EnemyData` + its `SkillData` (loaded via `DataLoader` from
-  `data/enemies/` and `data/skills/`, keyed by `EncounterData.enemy_id`)
+  `data/enemies/` and `data/skills/`, keyed by `EncounterData.enemy_ids`
+  — a battle is against a *pack*, 1 enemy for a solo boss/miniboss, 2-3
+  for a common encounter; `enemies`/`enemy_hps` are parallel arrays
+  indexed the same way throughout `BattleManager`)
 - `EquipmentData` effects, via `StatsCalculator` (Phase 3 — see Section
   6a below). `BattleManager` never reads `player.attack`/`defense`/
   `magic_power`/`max_hp`/`max_mp` directly; it always goes through
@@ -231,11 +234,20 @@ and `enemy_level` (used by `EnemyScaler` — see below).
 
 Exposed API (UI calls these, never touches damage math directly):
 - `start_battle(encounter_id: String)`
-- `player_attack()`, `player_use_skill(skill: SkillData)`,
-  `player_use_item()`, `player_defend()`, `player_run()`
+- `player_attack(target_index: int)`,
+  `player_use_skill(skill: SkillData, target_index: int = -1)` —
+  `target_index` is required and validated for `single_enemy` skills
+  (and basic Attack), ignored for `self`/`all_enemies` ones
+- `player_use_item()`, `player_defend()`, `player_run()`
+- `alive_enemy_indices() -> Array[int]` — query helper `BattleUI` uses
+  to decide whether a target-select submenu is even needed (a lone
+  survivor auto-targets with zero extra clicks)
+- `enemy_names_summary() -> String` — a pack summary for display, e.g.
+  `"Ember Wisp x2, Bramble Husk"` (collapses duplicates); the one
+  BattleManager helper UI calls purely for text, not math
 
 Exposed signals (UI reads state only through these plus the public
-`enemy` / `enemy_hp` / `player` fields):
+`enemies` / `enemy_hps` / `player` fields):
 - `turn_state_changed(state_name: String)` — `"player_input"`,
   `"resolving"`, `"enemy_turn"`, `"won"`, `"lost"`, `"fled"`
 - `action_resolved(message: String)` — one line for the message log
@@ -257,12 +269,24 @@ Section 6c — rather than flat subtraction):
   `skill.element` (`CombatMath.skill_power_stat()`, Section 6c), then
   the weapon family bonus below if it applies
 - Skill (`target_type == "self"`): heals `skill.power` HP, no defense involved
-- Defending halves the next hit taken (integer division), one-shot flag
-  cleared after it's used once
-- Enemies always use `skill_ids[0]` if they have one, else basic attack
-  — no enemy AI variety yet (Phase 2 scope); enemies have no equipment,
-  so `EnemyData`'s fields (scaled by `EnemyScaler` for level) are used
-  as-is
+- Defending halves *every* hit taken during the next full enemy phase
+  (integer division per hit — a pack phase can be multiple hits), the
+  one-shot flag cleared only once the whole phase resolves
+- Skill (`target_type == "all_enemies"`, depth pass): hits every
+  currently-alive pack member with the same `mitigate()` calculation
+  each, independently — see `blazing_arc.tres`, the first skill to use
+  this target type since the schema documented it back in Phase 2
+- Enemy turn order/skill choice: see Section 6d for the alternation/
+  enrage logic; enemies have no equipment, so `EnemyData`'s fields
+  (scaled by `EnemyScaler` for level) are used as-is
+- **Pack damage scaling (depth pass):** each pack member's outgoing hit
+  is scaled by `CombatMath.pack_scale(dmg, enemies.size())` — 100% solo,
+  85% in a 2-enemy pack, 70% in a 3-enemy pack. Found necessary via a
+  pack self-test: every member acting every turn made total pack damage
+  scale ~linearly with headcount, occasionally exceeding a solo boss's
+  output from three "common" enemies acting in a single phase. This is
+  the real-battle equivalent of most JRPGs individually undertuning
+  mob-pack members rather than reusing full solo stat blocks unscaled.
 - **Weapon family bonus (Phase 5 — Cindermourn's identity):** if
   `player.equipped_weapon.bonus_damage_vs_family` is non-empty and
   equals `enemy.family`, the computed damage is multiplied by
@@ -358,15 +382,31 @@ First rolls `drop_chance`; if that passes, picks weight-proportionally
 among `item_ids`. Content lives in `data/loot/`, referenced by
 `EnemyData.loot_table_id`.
 
-`BattleManager._win()` (Phase 4 addition) rolls the defeated enemy's
-loot table — `current_encounter.loot_table_id_override` if set (Phase
-5, used by generated dungeons whose loot tier depends on the dungeon's
-level, not the enemy's own fixed `loot_table_id`), else
-`enemy.loot_table_id` — adds any resulting item via `Inventory.add_item`,
-and — `EnemyData.gate_clue_id` field — calls `GameState.discover_clue()`
-if set. Both feed into the richer `action_resolved` victory message and
-the extended `battle_won` signal above, so `BattleUI` never has to ask
+`BattleManager._win()` (Phase 4 addition) rolls loot, XP, and gold for
+the whole defeated pack, not one enemy: XP/gold sum across every pack
+member (via `EnemyScaler`), and exactly one loot roll happens for the
+battle — `current_encounter.loot_table_id_override` if set (Phase 5,
+used by generated dungeons whose loot tier depends on the dungeon's
+level), else the first pack member with a non-empty `loot_table_id` —
+rather than one roll per enemy, which would spam the player with up to
+3 items from a single fight. `EnemyData.gate_clue_id` is checked across
+every pack member (any one discovering a clue is enough). Weapon
+`mp_restore_on_kill` (Cindermourn) now restores per pack member
+defeated (`mp_restore_on_kill * enemies.size()`), since a battle can
+contain multiple kills where it used to mean exactly one. All of this
+feeds into the richer `action_resolved` victory message and the
+extended `battle_won` signal above, so `BattleUI` never has to ask
 `BattleManager` "what happened" after the fact.
+
+**World loot chests (depth pass, distinct from this section's
+post-battle loot):** `LootChest` (`scripts/world/loot_chest.gd` +
+`scenes/world/props/LootChest.tscn`) is a visible, walk-up, one-shot
+loot source placed directly in a map — not tied to combat at all. It
+rolls its own `loot_table_id` (authored with `drop_chance = 1.0` so a
+chest always yields something — an empty chest would undercut the
+point of adding visible loot) and grants the result immediately via
+`Inventory.add_item`. Does not persist across leaving and re-entering
+the map, matching every other trigger in the project.
 
 `InventoryUI`'s equipment comparison (Section 6a) reads
 `EquipmentData`'s `@export` bonus fields directly via `Resource.get(field_name)`
@@ -453,6 +493,14 @@ replaces that:
   Ashen Warden is the only enemy using this today:
   `enrage_threshold = 0.5`, `enrage_skill_id = "ashen_warden_cinderquake"`
   (a new, stronger skill than its default Ashfall).
+- **Pack stagger (depth pass):** `_choose_enemy_skill_id(index)` offsets
+  the alternation check by the enemy's pack index —
+  `(enemy_turn_count + index) % 2 == 0` instead of just
+  `enemy_turn_count % 2 == 0`. A solo enemy (index 0) is unaffected;
+  found necessary by a pack self-test showing every pack member
+  upgrading to its (usually stronger) skill on the exact same
+  synchronized turn, producing a sudden lethal-feeling spike every other
+  round instead of a natural stagger.
 
 **Combat feedback**: `BattleManager` gained `enemy_hit(damage: int)` and
 `player_hit(damage: int)` signals, emitted alongside the existing damage
@@ -534,6 +582,16 @@ rather than unique per combination. All 4 templates' reachability
 with the same BFS self-test technique used for Cinderfall Woods in
 Phase 1 — see PROGRESS.md.
 
+**Scale (depth pass, post-Phase-6):** every tier's map size, corridor
+length, and encounter count grew substantially in response to
+playtest feedback that dungeons felt flat/empty — tier 0 went from
+`14x9` with 1 encounter to `22x11` with 2; tier 3 (the largest) from
+`24x15` with 4 encounters to `40x17` with 7, plus 1-2 `LootChest`
+instances per tier (`TIER_CHEST_TILES`, none at tier 0) placed in side
+branches as an exploration reward, using `generated_chest_loot.tres`.
+Every new tile's reachability was re-verified with the same BFS
+self-test technique, extended to also check every chest tile.
+
 **Origin-aware enemy pool (content-expansion pass):**
 `GeneratedDungeon`'s `ORIGIN_ENEMY_POOL` dictionary maps an origin word
 to its own enemy pair (`Verdant` -> Bramble Husk + the new Thornling,
@@ -546,11 +604,14 @@ to unique content for every current and future Origin word.
 
 **How a generated encounter differs from a hand-authored one:**
 `GeneratedEncounterTrigger` (`scripts/world/generated_encounter_trigger.gd`)
-builds an `EncounterData` *in memory* at trigger time (picking randomly
-from `enemy_ids`, an Ember Wisp/Bramble Husk pool) instead of loading
-one from `data/encounters/*.tres` — there's no practical way to
-pre-author a row per possible word combination. It sets the new
-`EncounterData.level` and `loot_table_id_override` fields from the
+builds an `EncounterData` *in memory* at trigger time instead of
+loading one from `data/encounters/*.tres` — there's no practical way to
+pre-author a row per possible word combination. Its `enemy_pool` export
+(renamed from `enemy_ids` in the depth pass, to stop reading as "this
+is the fight's actual roster" — it's a pool to draw *from*) is sampled
+`pack_size_min`..`pack_size_max` times (default 2-3, with repetition)
+to build `EncounterData.enemy_ids`, the pack that actually spawns. It
+sets `EncounterData.level` and `loot_table_id_override` from the
 dungeon's profile, then calls `SceneManager.go_to_generated_battle()`.
 `BattleManager._enter_tree()` checks `GameState.pending_generated_encounter`
 before falling back to the file-based `pending_encounter_id` path, so
@@ -589,6 +650,33 @@ Deliberately **not** applied to Town: Waymark is the safe hub and stays
 fully lit; only dungeons get the darker, tenser presentation. This is
 presentation-layer only — it has no gameplay effect and reads nothing
 from combat or progression state.
+
+## 7c. Gate Preview (depth pass, post-Phase-6)
+
+Playtest feedback: choosing 3 words and opening the Gate with zero idea
+what's on the other side (level, monsters, size) felt like flying
+blind rather than an informed choice. `GateUI._update_preview()` fixes
+this without adding any new logic — it calls `GateResolver.resolve()`
+speculatively (a pure query, safe to call before committing) the
+instant all 3 `OptionButton`s have a selection, and branches on the
+result type:
+
+- **`GENERATED`** gets the real breakdown: `profile.level`, a
+  size description indexed by `branch_tier`
+  (`"a small chamber"` .. `"a vast, branching complex"`), and the
+  actual enemy names from `GeneratedDungeon.ORIGIN_ENEMY_POOL`/
+  `DEFAULT_ENEMY_POOL` for that origin — reusing `GeneratedDungeon`'s
+  own constants (via `preload`) rather than duplicating the origin/enemy
+  mapping in `GateUI`.
+- **`KNOWN`**/**`SPECIAL`** get a short evocative line instead — these
+  are fixed, hand-designed destinations, not formula output, so a full
+  breakdown would either be redundant (Cinderfall Woods) or spoil the
+  Red Gate's reveal. The preview is about informed choice for the
+  formula-driven majority of combinations, not eliminating all mystery.
+- **`INVALID`** gets a one-line hint that the words don't fit.
+
+Recomputed on every `item_selected` signal from any of the 3 dropdowns;
+cleared when fewer than 3 are chosen or the panel closes.
 
 ## 8. Save Data Shape (Phase 0 minimum)
 

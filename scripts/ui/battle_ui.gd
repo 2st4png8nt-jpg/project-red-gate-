@@ -3,25 +3,34 @@ extends CanvasLayer
 # Controls; sends player choices back only through BattleManager's
 # player_*() methods. Contains no combat math (Agent 2 owns that) — see
 # ARCHITECTURE.md Section 6 / AGENT_CONTRACTS.md.
+#
+# Depth pass (post-Phase-6): fights are against a pack of 1-3 enemies.
+# EnemyList shows one row per pack member; a TargetMenu submenu appears
+# only when more than one enemy is alive and the player Attacks or uses
+# a single_enemy Skill — with exactly one alive, targeting is automatic
+# so a solo fight (most bosses) still takes zero extra clicks.
 
-const UNIVERSAL_SKILL_IDS := ["ember_slash", "guard_break", "second_wind"]
+const UNIVERSAL_SKILL_IDS := ["ember_slash", "guard_break", "second_wind", "blazing_arc"]
 
 @onready var battle_manager: Node = get_parent()
 @onready var root: Control = $Root
 @onready var hit_flash: ColorRect = $Root/HitFlash
-@onready var enemy_name_label: Label = $Root/EnemyPanel/EnemyName
-@onready var enemy_hp_label: Label = $Root/EnemyPanel/EnemyHP
+@onready var enemy_list: VBoxContainer = $Root/EnemyList
 @onready var player_hp_label: Label = $Root/PlayerPanel/PlayerHP
 @onready var player_mp_label: Label = $Root/PlayerPanel/PlayerMP
 @onready var message_label: Label = $Root/MessageLabel
 @onready var command_menu: VBoxContainer = $Root/CommandMenu
 @onready var skill_menu: VBoxContainer = $Root/SkillMenu
+@onready var target_menu: VBoxContainer = $Root/TargetMenu
 @onready var attack_button: Button = $Root/CommandMenu/AttackButton
 @onready var skill_button: Button = $Root/CommandMenu/SkillButton
 @onready var item_button: Button = $Root/CommandMenu/ItemButton
 @onready var defend_button: Button = $Root/CommandMenu/DefendButton
 @onready var run_button: Button = $Root/CommandMenu/RunButton
 @onready var skill_back_button: Button = $Root/SkillMenu/BackButton
+@onready var target_back_button: Button = $Root/TargetMenu/BackButton
+
+var _pending_skill: SkillData = null # non-null while targeting for a Skill rather than a basic Attack
 
 func _ready() -> void:
 	var skill_ids := UNIVERSAL_SKILL_IDS.duplicate()
@@ -38,13 +47,15 @@ func _ready() -> void:
 		skill_menu.add_child(btn)
 		skill_menu.move_child(skill_back_button, skill_menu.get_child_count() - 1)
 	skill_menu.hide()
+	target_menu.hide()
 
-	attack_button.pressed.connect(func(): battle_manager.player_attack())
+	attack_button.pressed.connect(_on_attack_pressed)
 	skill_button.pressed.connect(_show_skill_menu)
 	item_button.pressed.connect(func(): battle_manager.player_use_item())
 	defend_button.pressed.connect(func(): battle_manager.player_defend())
 	run_button.pressed.connect(func(): battle_manager.player_run())
 	skill_back_button.pressed.connect(_hide_skill_menu)
+	target_back_button.pressed.connect(_hide_target_menu)
 
 	battle_manager.turn_state_changed.connect(_on_turn_state_changed)
 	battle_manager.action_resolved.connect(_on_action_resolved)
@@ -55,19 +66,66 @@ func _ready() -> void:
 	battle_manager.enemy_hit.connect(_on_enemy_hit)
 	battle_manager.player_hit.connect(_on_player_hit)
 
-	enemy_name_label.text = battle_manager.enemy.display_name
-	message_label.text = "A wild %s appears!" % battle_manager.enemy.display_name
+	message_label.text = "%s appears!" % battle_manager.enemy_names_summary()
 	_refresh_stats()
 
 func _refresh_stats() -> void:
-	var enemy_max_hp := EnemyScaler.max_hp(battle_manager.enemy, battle_manager.enemy_level)
-	enemy_hp_label.text = "HP %d/%d" % [battle_manager.enemy_hp, enemy_max_hp]
+	for child in enemy_list.get_children():
+		child.queue_free()
+	for i in battle_manager.enemies.size():
+		var enemy: EnemyData = battle_manager.enemies[i]
+		var hp: int = battle_manager.enemy_hps[i]
+		var label := Label.new()
+		if hp <= 0:
+			label.text = "%s — defeated" % enemy.display_name
+			label.modulate = Color(0.55, 0.55, 0.55)
+		else:
+			var max_hp := EnemyScaler.max_hp(enemy, battle_manager.enemy_level)
+			label.text = "%s  HP %d/%d" % [enemy.display_name, hp, max_hp]
+		enemy_list.add_child(label)
 	player_hp_label.text = "HP %d/%d" % [battle_manager.player.hp, StatsCalculator.effective_max_hp(battle_manager.player)]
 	player_mp_label.text = "MP %d/%d" % [battle_manager.player.mp, StatsCalculator.effective_max_mp(battle_manager.player)]
 
+func _on_attack_pressed() -> void:
+	_pending_skill = null
+	_start_targeting()
+
 func _on_skill_chosen(skill: SkillData) -> void:
 	_hide_skill_menu()
-	battle_manager.player_use_skill(skill)
+	if skill.target_type == "single_enemy":
+		_pending_skill = skill
+		_start_targeting()
+	else:
+		battle_manager.player_use_skill(skill)
+
+## Auto-targets the lone survivor with zero extra clicks; only pauses
+## for an explicit target pick when more than one enemy is alive.
+func _start_targeting() -> void:
+	var alive: Array[int] = battle_manager.alive_enemy_indices()
+	if alive.size() <= 1:
+		_confirm_target(alive[0] if alive.size() == 1 else -1)
+		return
+	command_menu.hide()
+	for child in target_menu.get_children():
+		if child != target_back_button:
+			child.queue_free()
+	for i in alive:
+		var enemy: EnemyData = battle_manager.enemies[i]
+		var btn := Button.new()
+		btn.text = "%s (HP %d)" % [enemy.display_name, battle_manager.enemy_hps[i]]
+		btn.pressed.connect(_confirm_target.bind(i))
+		target_menu.add_child(btn)
+		target_menu.move_child(target_back_button, target_menu.get_child_count() - 1)
+	target_menu.show()
+
+func _confirm_target(index: int) -> void:
+	_hide_target_menu()
+	if _pending_skill != null:
+		var skill := _pending_skill
+		_pending_skill = null
+		battle_manager.player_use_skill(skill, index)
+	else:
+		battle_manager.player_attack(index)
 
 func _show_skill_menu() -> void:
 	command_menu.hide()
@@ -77,15 +135,24 @@ func _hide_skill_menu() -> void:
 	skill_menu.hide()
 	command_menu.show()
 
+func _hide_target_menu() -> void:
+	target_menu.hide()
+	command_menu.show()
+	_pending_skill = null
+
 func _on_turn_state_changed(state_name: String) -> void:
 	var can_act := state_name == "player_input"
 	if not can_act:
 		skill_menu.hide()
+		target_menu.hide()
 		command_menu.show()
 	for child in command_menu.get_children():
 		if child is Button:
 			child.disabled = not can_act
 	for child in skill_menu.get_children():
+		if child is Button:
+			child.disabled = not can_act
+	for child in target_menu.get_children():
 		if child is Button:
 			child.disabled = not can_act
 	_refresh_stats()
@@ -121,6 +188,7 @@ func _shake(strength: float) -> void:
 func _on_battle_won(xp: int, gold: int, leveled_up: bool, loot_item_name: String, clue_discovered: bool) -> void:
 	command_menu.hide()
 	skill_menu.hide()
+	target_menu.hide()
 	var extra := " You leveled up!" if leveled_up else ""
 	var loot_text := " Found: %s!" % loot_item_name if loot_item_name != "" else ""
 	var clue_text := " A note falls from the wreckage..." if clue_discovered else ""
@@ -132,6 +200,7 @@ func _on_battle_won(xp: int, gold: int, leveled_up: bool, loot_item_name: String
 func _on_battle_lost() -> void:
 	command_menu.hide()
 	skill_menu.hide()
+	target_menu.hide()
 	message_label.text = "You were defeated... retreating to Waymark."
 	Sfx.play("defeat")
 	await get_tree().create_timer(1.2).timeout
@@ -140,6 +209,7 @@ func _on_battle_lost() -> void:
 func _on_battle_fled() -> void:
 	command_menu.hide()
 	skill_menu.hide()
+	target_menu.hide()
 	Sfx.play("flee")
 	await get_tree().create_timer(0.6).timeout
 	SceneManager.go_to_current_map()

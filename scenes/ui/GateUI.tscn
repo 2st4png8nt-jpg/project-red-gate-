@@ -40,6 +40,13 @@ offset_top = 96.0
 offset_right = 200.0
 offset_bottom = 120.0
 
+[node name="PreviewLabel" type="Label" parent="Root"]
+offset_left = 216.0
+offset_top = 40.0
+offset_right = 624.0
+offset_bottom = 120.0
+autowrap_mode = 2
+
 [node name="OpenButton" type="Button" parent="Root"]
 offset_left = 16.0
 offset_top = 124.0

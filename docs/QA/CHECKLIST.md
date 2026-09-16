@@ -2,6 +2,49 @@
 
 Owner: Agent 9 (QA)
 
+## Exit criteria for the depth pass (packs, bigger dungeons, chests, Gate preview) — manual, needs a display
+
+Not yet run against this build.
+
+- [ ] Fighting a common encounter in a generated dungeon or Cinderfall
+      Woods shows 2-3 distinct enemies at once (not always the same
+      count — packs vary), each with its own HP bar in the battle UI.
+- [ ] Choosing Attack or a single-target Skill against a pack with more
+      than one enemy alive opens a target-select menu naming each
+      enemy and its current HP; choosing one damages only that enemy.
+- [ ] Fighting the Ashen Warden or the Cinder Wraith (solo fights)
+      shows no target-select menu at all — Attack/Skill resolve
+      immediately against the one enemy, exactly like before this pass.
+- [ ] Using Blazing Arc against a pack damages every living member in
+      one action, and the message names the total damage dealt.
+- [ ] Defeating a full pack shows one combined victory message (not one
+      per enemy) with XP/gold that reads as more than a solo fight of
+      the same enemy type, and exactly one item is found at most (never
+      more than one from a single pack fight).
+- [ ] A 2-3 enemy pack fight is winnable by a reasonably-geared player
+      who uses Defend/Item sensibly — it should feel dangerous, not
+      instantly lethal within the first couple of turns.
+- [ ] Cinderfall Woods now has two branches (north to the Cinder
+      Wraith, a new south one) and is visibly larger than before; the
+      south branch contains a loot chest guarded by a pack.
+- [ ] Walking into an unopened chest immediately grants an item and
+      shows what was found; the chest's marker visibly dims afterward
+      and walking into it again does nothing.
+- [ ] A generated dungeon (any tier) has visibly more encounter markers
+      and at least one loot chest (except the smallest, single-room
+      tier, which has none) compared to earlier builds.
+- [ ] In the Gate UI, choosing all 3 words for a combination that
+      generates a dungeon shows a preview naming a level, a size
+      description, and specific monster names *before* pressing Open
+      Gate; changing any one word updates the preview.
+- [ ] Choosing the Cinderfall Woods or Red Gate combination shows a
+      short flavor line instead of a full breakdown; choosing an
+      invalid combination shows a line saying the words don't fit.
+- [ ] No script errors appear in the console across a full loop: fight
+      a pack (using both Attack-with-targeting and Blazing Arc), open a
+      chest, preview a Gate combination of each result type, and open
+      the enlarged Cinderfall Woods end to end.
+
 ## Exit criteria for the content-expansion pass (post-Phase-6) — manual, needs a display
 
 Not yet run against this build.

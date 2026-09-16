@@ -4,6 +4,6 @@
 
 [resource]
 script = ExtResource("1")
-id = "ember_wisp_encounter"
-enemy_id = "ember_wisp"
+id = "cinderfall_pack_embers"
+enemy_ids = Array[String](["ember_wisp", "ember_wisp"])
 can_flee = true
