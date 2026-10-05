@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CharacterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/character_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "player_fisherman"
+display_name = "Fisherman (Adaptive)"
+position_name = "Fisherman"
+specialization = "Adaptive"
+max_hp = 100
+max_sp = 100
+sp_per_basic_attack = 5
+attack = 12
+defense = 6
+move_speed = 190.0
+attack_range = 48.0
+is_player_controlled = true
