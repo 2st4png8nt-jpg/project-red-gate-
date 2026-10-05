@@ -1,33 +1,46 @@
 # Progress
 
-## Status: Phase 1 complete (movement + camera + basic combat)
+## Status: Phases 1-3 complete (movement/combat, targeting/AI, HP+SP)
 
 Validated headlessly — project boots, all 4 autoloads initialize, the
-test arena loads, and the attack path (player -> nearest enemy in
-range -> damage -> SP gain) runs with no script errors.
+test arena loads, and a 200-frame simulated run (enemy chases from
+aggro range into attack range and starts hitting the player) produces
+no script errors.
 
 ## What exists right now
 
 - Project skeleton: `project.godot`, folder structure, `.gitignore`,
   placeholder icon.
 - Autoloads: EventBus, DataLoader, GameState, SceneManager.
-- Data schema: `CharacterData`. Content: `player_fisherman.tres`
-  (the Phase 1 "Adaptive Fisherman" player character).
-- Scenes: `Boot.tscn`, `Player.tscn`, `TestDummy.tscn`,
-  `TestArena.tscn`.
-- Player: WASD movement (raw key polling, no InputMap actions defined
-  yet — simplest option for Phase 1, revisit once a real control
-  scheme / rebinding screen is needed), camera follow, LMB basic
-  attack that damages the nearest in-range enemy and grants SP via
+- Data schemas: `CharacterData`, `EnemyData`. Content:
+  `player_fisherman.tres` (Phase 1 "Adaptive Fisherman" player),
+  `dummy_brute.tres` (Phase 2 test enemy).
+- Scenes: `Boot.tscn`, `Player.tscn`, `Enemy.tscn`, `TestArena.tscn`,
+  `Hud.tscn`.
+- **Player**: WASD movement (raw key polling, no InputMap actions
+  defined yet — simplest option for now, revisit once a real control
+  scheme / rebinding screen is needed), camera follow, explicit
+  targeting (Tab cycles nearest-first through all enemies; clicking an
+  enemy selects it directly), LMB basic attack that hits the current
+  target if in range, else falls back to the nearest enemy in range
+  (so the player is never left unable to act), and grants SP via
   `GameState.add_sp()`.
-- TestDummy: static HP pool with a live label, dies at 0 HP. No AI —
-  that's Phase 2.
+- **Enemy**: data-driven (`EnemyData`) state machine — IDLE (player
+  outside aggro range) -> CHASE (move toward player) -> ATTACK (player
+  in attack range, hits on a cooldown via `GameState.damage_player()`).
+  Clickable (`input_pickable`) to set itself as the player's target.
+  Dies at 0 HP.
+- **Hud**: player HP/SP bars driven by `EventBus.player_hp_changed` /
+  `player_sp_changed`; a target panel (name + HP bar) that appears
+  when a target is selected, polling the targeted Enemy's `hp`
+  directly each frame (simplest option — no per-enemy HP-changed
+  signal needed yet).
 
 ## Validated
 
 ```
-godot4 --headless --editor --quit        # one-time: build global script class cache
-godot4 --headless --path . --quit-after 2
+godot4 --headless --editor --quit         # one-time per session: build global script class cache
+godot4 --headless --path . --quit-after 200
 ```
 
 Output:
@@ -37,21 +50,20 @@ Output:
 [TestArena] loaded.
 ```
 
-No SCRIPT ERROR / parse / compile errors.
+No SCRIPT ERROR / parse / compile errors across the run, including the
+enemy's full IDLE -> CHASE -> ATTACK transition and player damage.
 
-## Spec Section 41 "STOP AND TEST" — not yet answerable
+## Spec Section 41 "STOP AND TEST" — still not answerable from headless runs
 
-The 8 playtest questions need an actual play session (feel of
+The 8 playtest questions need an actual human play session (feel of
 movement, attack timing, whether combat reads as "deliberate" rather
-than twitchy, etc.), not just a headless boot check. This prototype
-isn't playable by a human yet — no exported build exists, and basic
-attack / movement alone isn't enough content to judge combat feel
-against. Revisit this checkpoint once Phase 2 (targeting + enemy AI)
-and Phase 3 (HP/SP UI) land, since right now there's no way to see
-your own HP/SP or a real fight back from an enemy.
+than twitchy, whether targeting via Tab/click feels natural, etc.).
+Headless validation only proves the systems don't crash — it says
+nothing about feel. An exported/playable build is the next thing
+needed before that checkpoint can be answered honestly.
 
-## Next up (task #62 — Phase 2)
+## Next up (task #64 — Phase 4)
 
-Targeting (explicit target selection/switching, not just "nearest in
-range") + giving TestDummy (or a successor) actual enemy AI so there's
-something to fight back against.
+Skills: ACTIVE/PASSIVE/TRIGGER skill data schema, SP-cost consumption,
+and at least one usable active skill bound to a number key, building
+on the SP pool this phase already wired up.

@@ -39,9 +39,9 @@ player's Adaptive character and AI Specialist companions alike — only
 position_name, specialization, max_hp, max_sp, sp_per_basic_attack,
 attack, defense, move_speed, attack_range, is_player_controlled.
 
-Further schemas (EquipmentData, SkillData, EnemyData, LootTableData)
-land in their matching phases rather than being speculatively defined
-now, per the "don't build ahead of the current phase" discipline.
+Further schemas (EquipmentData, SkillData, LootTableData) land in
+their matching phases rather than being speculatively defined now, per
+the "don't build ahead of the current phase" discipline.
 
 ## Combat architecture (fundamentally different from Red Gate)
 
@@ -53,23 +53,48 @@ into a "battle mode." `Player` (`scripts/world/player.gd`) is a
 basic attack by scanning the `"enemies"` group for the nearest target
 in range.
 
-## Phase 1 scene set
+## Scene set (Phases 1-3)
 
 - `scenes/main/Boot.tscn` — `run/main_scene`. Prints autoload-ready
   status, then calls `SceneManager.go_to_test_arena()`.
 - `scenes/world/Player.tscn` — `CharacterBody2D`, circle collider
   (layer 2), `ColorRect` placeholder visual, child `Camera2D` (smoothed
   follow), `AttackCooldownTimer` (0.5s, one-shot) gating basic-attack
-  spam. Script: `scripts/world/player.gd`.
-- `scenes/world/TestDummy.tscn` — stationary `CharacterBody2D` (layer
-  4, group `"enemies"`), `ColorRect` visual, `Label` showing current
-  HP. Script: `scripts/world/test_dummy.gd`. No AI yet — Phase 2 adds
-  that; this exists only to prove basic-attack damage works end to
-  end.
+  spam. Script: `scripts/world/player.gd`. Owns targeting state
+  (`current_target`) — Tab cycles nearest-first through the
+  `"enemies"` group; an `Enemy` can also set itself as the target
+  directly via a click (see below). Basic attack prefers the current
+  target when in range, else falls back to nearest-in-range, so the
+  player can never be stuck unable to act just because nothing is
+  targeted.
+- `scenes/world/Enemy.tscn` — `CharacterBody2D` (layer 4, group
+  `"enemies"`, `input_pickable = true` so clicks can be picked up),
+  `ColorRect` visual, `Label` showing current HP, `AttackTimer`
+  (one-shot, re-armed to `EnemyData.attack_cooldown`). Script:
+  `scripts/world/enemy.gd` — a 3-state machine (IDLE/CHASE/ATTACK)
+  driven entirely by `EnemyData` fields (aggro_range, attack_range,
+  move_speed, attack, attack_cooldown), so new enemy types are new
+  `.tres` instances, never new code. `_on_input_event` lets a player
+  click select it as the target.
 - `scenes/world/TestArena.tscn` — flat `ColorRect` floor, a
   `PlayerSpawn` marker, and a `DummySpawns` group of markers the arena
-  script instances a `TestDummy` at. Script:
+  script instances an `Enemy` at. Also instances `Hud.tscn`. Script:
   `scripts/world/test_arena.gd`.
+- `scenes/ui/Hud.tscn` — `CanvasLayer` with HP/SP `ProgressBar`s driven
+  by `EventBus.player_hp_changed`/`player_sp_changed`, plus a target
+  panel (name + HP bar) shown on `EventBus.target_changed` and kept
+  current each frame by reading the targeted `Enemy`'s `hp` directly
+  (no per-enemy HP signal yet — simplest option until something else
+  needs one). Script: `scripts/ui/hud.gd`.
+
+## Data schemas (Phases 1-3)
+
+- `CharacterData` (`scripts/data/character_data.gd`) — shared by the
+  player's Adaptive character and AI Specialist companions; only
+  `specialization` differs.
+- `EnemyData` (`scripts/data/enemy_data.gd`) — id, display_name,
+  max_hp, attack, move_speed, aggro_range, attack_range,
+  attack_cooldown, is_elite.
 
 ## Collision layers
 
